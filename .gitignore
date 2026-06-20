@@ -1,0 +1,112 @@
+# ============================================
+# ROOT GITIGNORE - Presensi App Monorepo
+# ============================================
+# Created: 2026-06-21
+# Purpose: Ignore files untuk Laravel + Flutter
+
+# ----------------------------------------
+# Backend: Laravel
+# ----------------------------------------
+/backend/vendor/
+/backend/node_modules/
+/backend/.env
+/backend/.env.backup
+/backend/storage/*.key
+/backend/bootstrap/cache/
+/backend/public/hot
+/backend/public/storage
+/backend/public/build
+/backend/npm-debug.log
+/backend/yarn-error.log
+/backend/.phpunit.result.cache
+/backend/Horde.log
+/backend/.idea
+/backend/.vscode
+
+# ----------------------------------------
+# Frontend: Flutter
+# ----------------------------------------
+/frontend/build/
+/frontend/.dart_tool/
+/frontend/.packages
+/frontend/.flutter-plugins
+/frontend/.flutter-plugins-dependencies
+/frontend/android/.gradle/
+/frontend/android/.idea/
+/frontend/android/local.properties
+/frontend/ios/.symlinks/
+/frontend/ios/Pods/
+/frontend/ios/.generated/
+/frontend/.vscode/
+/frontend/.idea/
+/frontend/*.iml
+/frontend/.metadata
+/frontend/.packages
+/frontend/pubspec.lock
+
+# ----------------------------------------
+# IDE & Editors (Global)
+# ----------------------------------------
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ----------------------------------------
+# Logs & Temporary Files
+# ----------------------------------------
+*.log
+*.tmp
+*.temp
+*.cache
+*.pid
+*.seed
+*.pid.lock
+
+# ----------------------------------------
+# OS Generated Files
+# ----------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ----------------------------------------
+# Build Artifacts
+# ----------------------------------------
+*.apk
+*.ipa
+*.app
+*.aab
+*.exe
+*.msi
+
+# ----------------------------------------
+# Environment & Secrets
+# ----------------------------------------
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.cert
+*.p12
+*.pfx
+
+# ----------------------------------------
+# Documentation & Notes (Optional)
+# ----------------------------------------
+# NOTES.md
+# TODO.md
+
+# ============================================
+# END OF ROOT GITIGNORE
+# ============================================
