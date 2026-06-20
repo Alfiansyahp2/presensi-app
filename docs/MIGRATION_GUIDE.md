@@ -137,14 +137,17 @@ php artisan migrate
 
 | Email | Password | Fullname | NISN | Kelas | Role |
 |-------|----------|----------|------|------|------|
-| `arlen@gmail.com` | `password123` | arlen | 1234567890 | 12 | Siswa |
-| `admin@presensi.sch.id` | `admin123` | Administrator | ADMIN001 | ADMIN | Admin |
-| `siswa1@test.com` | `password123` | Siswa Test 1 | 1234567891 | 10 | Siswa (local only) |
-| `siswa2@test.com` | `password123` | Siswa Test 2 | 1234567892 | 11 | Siswa (local only) |
-| `siswa3@test.com` | `password123` | Siswa Test 3 | 1234567893 | 12 | Siswa (local only) |
+| `siswa@example.com` | `password123` | Siswa Contoh | 1234567890 | 12 | Siswa |
+| `admin@sekolah.sch.id` | `admin123` | Administrator | ADMIN001 | ADMIN | Admin |
+| `siswa1@test.local` | `password123` | Siswa Test 1 | 1234567891 | 10 | Siswa (local only) |
+| `siswa2@test.local` | `password123` | Siswa Test 2 | 1234567892 | 11 | Siswa (local only) |
+| `siswa3@test.local` | `password123` | Siswa Test 3 | 1234567893 | 12 | Siswa (local only) |
+
+⚠️ **Note:** Email di atas adalah contoh. Untuk data asli, gunakan `UserSeeder.local.php`
 
 ### Absensi Data
-- 5 record absensi untuk user `arlen@gmail.com` dari May 12, 2026
+- Contoh data absensi untuk user `siswa@example.com`
+- Data asli tersimpan di `AbsensiSeeder.local.php` (tidak di-track di Git)
 - Tambahan data test untuk development (local environment only)
 
 ---
@@ -195,7 +198,7 @@ php artisan tinker
 => 5  // Jumlah user setelah seeder
 
 >>> \App\Models\Absensi::count()
-=> 8  // 5 dari arlen + 3 dari siswa1 (local only)
+=> 8  // 3 dari siswa@example.com + 3 dari siswa1 (local only) + 2 contoh
 ```
 
 ---
@@ -258,9 +261,11 @@ php artisan db:seed
 
 | File | Purpose | Date |
 |------|---------|------|
-| `UserSeeder.php` | Seed users (arlen + admin + test users) | 2026-06-21 |
-| `AbsensiSeeder.php` | Seed absensi sesuai SQL dump | 2026-06-21 |
-| `DatabaseSeeder.php` | Main seeder coordinator | 2026-06-21 |
+| `UserSeeder.example.php` | Seed users (template generik) | 2026-06-21 |
+| `UserSeeder.local.php` | Seed users (data asli - NOT in Git) | 2026-06-21 |
+| `AbsensiSeeder.example.php` | Seed absensi (template generik) | 2026-06-21 |
+| `AbsensiSeeder.local.php` | Seed absensi (data asli - NOT in Git) | 2026-06-21 |
+| `DatabaseSeeder.php` | Main seeder coordinator (auto-detect local files) | 2026-06-21 |
 
 ---
 

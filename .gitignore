@@ -102,6 +102,13 @@ Thumbs.db
 *.pfx
 
 # ----------------------------------------
+# Personal Data Files (LOCAL ONLY!)
+# ----------------------------------------
+/backend/database/seeders/*.local.php
+/backend/.env.local
+PRIVATE_DATA_BACKUP.md
+
+# ----------------------------------------
 # Documentation & Notes (Optional)
 # ----------------------------------------
 # NOTES.md
@@ -110,3 +117,8 @@ Thumbs.db
 # ============================================
 # END OF ROOT GITIGNORE
 # ============================================
+
+# ⚠️  NOTE: Example files (.example.php) ARE tracked in Git
+# This allows developers to have templates while keeping
+# personal data (*.local.php) private and excluded from version control
+

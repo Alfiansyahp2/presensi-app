@@ -6,12 +6,13 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-class UserSeeder extends Seeder
+class UserSeederExample extends Seeder
 {
     /**
-     * Seeder untuk data user siswa
+     * Example Seeder untuk User - DATA GENERIK
      *
-     * Berdasarkan data aktual dari presensis (2).sql
+     * Ini adalah TEMPLATE untuk developer lain.
+     * Untuk data asli, gunakan UserSeeder.local.php
      *
      * Password default: 'password123' (atau dari env SEEDER_PASSWORD)
      */
@@ -20,25 +21,26 @@ class UserSeeder extends Seeder
         // Default password dari env atau gunakan 'password123'
         $defaultPassword = env('SEEDER_PASSWORD', 'password123');
 
+        // User siswa contoh (GANTI dengan data asli di UserSeeder.local.php)
         User::updateOrCreate(
-            ['email' => 'arlen@gmail.com'],
+            ['email' => 'siswa@example.com'],
             [
-                'fullname' => 'arlen',
+                'fullname' => 'Siswa Contoh',
                 'nisn' => '1234567890',
                 'kelas' => '12',
-                'email' => 'arlen@gmail.com',
+                'email' => 'siswa@example.com',
                 'password' => Hash::make($defaultPassword),
             ]
         );
 
         // Optional: Tambah user admin
         User::updateOrCreate(
-            ['email' => 'admin@presensi.sch.id'],
+            ['email' => 'admin@sekolah.sch.id'],
             [
                 'fullname' => 'Administrator',
                 'nisn' => 'ADMIN001',
                 'kelas' => 'ADMIN',
-                'email' => 'admin@presensi.sch.id',
+                'email' => 'admin@sekolah.sch.id',
                 'password' => Hash::make(env('ADMIN_PASSWORD', 'admin123')),
             ]
         );
@@ -50,19 +52,19 @@ class UserSeeder extends Seeder
                     'fullname' => 'Siswa Test 1',
                     'nisn' => '1234567891',
                     'kelas' => '10',
-                    'email' => 'siswa1@test.com',
+                    'email' => 'siswa1@test.local',
                 ],
                 [
                     'fullname' => 'Siswa Test 2',
                     'nisn' => '1234567892',
                     'kelas' => '11',
-                    'email' => 'siswa2@test.com',
+                    'email' => 'siswa2@test.local',
                 ],
                 [
                     'fullname' => 'Siswa Test 3',
                     'nisn' => '1234567893',
                     'kelas' => '12',
-                    'email' => 'siswa3@test.com',
+                    'email' => 'siswa3@test.local',
                 ],
             ];
 
@@ -75,5 +77,9 @@ class UserSeeder extends Seeder
                 );
             }
         }
+
+        $this->command->info('✅ Example users seeded successfully.');
+        $this->command->warn('⚠️  This is example data only!');
+        $this->command->warn('⚠️  For real data, create UserSeeder.local.php');
     }
 }
