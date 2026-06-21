@@ -53,4 +53,26 @@ class SharedStorage {
         lastAbsenDateTime.month == now.month &&
         lastAbsenDateTime.day == now.day;
   }
+
+  // =============================================
+  // THEME PERSISTENCE - Light/Dark Mode
+  // =============================================
+
+  // Save theme preference
+  static Future<void> saveThemeMode(bool isDarkMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_dark_mode', isDarkMode);
+  }
+
+  // Get theme preference
+  static Future<bool> getThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('is_dark_mode') ?? false; // Default: light mode
+  }
+
+  // Clear theme preference (reset to default)
+  static Future<void> clearThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('is_dark_mode');
+  }
 }

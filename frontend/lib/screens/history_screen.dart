@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_absensi/service/API_config.dart';
-import 'package:flutter_absensi/utils/shared_storage.dart';
-import 'package:flutter_absensi/theme/app_theme.dart';
+import '../utils/shared_storage.dart';
+import '../core/widgets/animated_background.dart';
+import '../core/theme/app_colors.dart';
+import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
+/// 🎨 Formal History Screen dengan Theme Support
+///
+/// Features:
+/// - Formal professional design
+/// - Light & Dark mode support
+/// - Animated gradient background
+/// - Attendance history dengan animations
+/// - Theme toggle button
+/// - Refresh functionality
+///
+/// Context: Aplikasi Presensi Sekolah Premium 2025-2026
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
 
@@ -14,9 +25,12 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   List<dynamic> _attendanceHistory = [];
   bool _isLoading = true;
+  bool _isDarkMode = false;
+
+  // Fade & slide animations
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -25,8 +39,20 @@ class _HistoryScreenState extends State<HistoryScreen>
   void initState() {
     super.initState();
     _fetchAttendanceHistory();
+    _initAnimations();
+    _loadThemePreference();
+  }
 
-    // Initialize animations
+  Future<void> _loadThemePreference() async {
+    final isDarkMode = await SharedStorage.getThemeMode();
+    if (mounted) {
+      setState(() {
+        _isDarkMode = isDarkMode;
+      });
+    }
+  }
+
+  void _initAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
@@ -52,6 +78,14 @@ class _HistoryScreenState extends State<HistoryScreen>
     _animationController.forward();
   }
 
+  void _toggleTheme() {
+    setState(() {
+      _isDarkMode = !_isDarkMode;
+    });
+    // Save theme preference
+    SharedStorage.saveThemeMode(_isDarkMode);
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -61,13 +95,18 @@ class _HistoryScreenState extends State<HistoryScreen>
   Future<void> _fetchAttendanceHistory() async {
     final token = await SharedStorage.getToken();
     if (token == null) {
-      Navigator.pushReplacementNamed(context, '/login');
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
       return;
     }
 
     try {
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/history'),
+        Uri.parse('http://localhost:8000/api/history'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -77,10 +116,12 @@ class _HistoryScreenState extends State<HistoryScreen>
 
       if (response.statusCode == 200) {
         final responseData = json.decode(utf8.decode(response.bodyBytes));
-        setState(() {
-          _attendanceHistory = responseData['data'];
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _attendanceHistory = responseData['data'];
+            _isLoading = false;
+          });
+        }
       } else {
         _handleError('Gagal memuat riwayat');
       }
@@ -97,60 +138,118 @@ class _HistoryScreenState extends State<HistoryScreen>
   }
 
   void _handleError(String message) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(context).pop(),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
     setState(() {
       _isLoading = false;
     });
   }
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'hadir':
+        return AppColors.formalGreen;
+      case 'izin':
+        return AppColors.formalGold;
+      case 'sakit':
+        return const Color(0xFF8B5CF6); // Violet untuk sakit
+      default:
+        return AppColors.error;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'hadir':
+        return 'Hadir';
+      case 'izin':
+        return 'Izin';
+      case 'sakit':
+        return 'Sakit';
+      default:
+        return 'Tidak Hadir';
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'hadir':
+        return Icons.check_circle;
+      case 'izin':
+        return Icons.event_note;
+      case 'sakit':
+        return Icons.local_hospital;
+      default:
+        return Icons.cancel;
+    }
+  }
+
   Widget _buildEmptyState() {
     return Center(
-      child: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              CupertinoIcons.calendar,
-              size: 80,
-              color: AppColors.textTertiary,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.calendar_today,
+            size: 80,
+            color: _isDarkMode
+                ? AppColors.darkTextSecondary.withValues(alpha: 0.5)
+                : AppColors.textTertiary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum Ada Riwayat',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: _isDarkMode
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
             ),
-            const SizedBox(height: 16),
-            Text(
-              'Belum Ada Riwayat',
-              style: AppTextStyles.titleMedium.copyWith(
-                color: AppColors.textSecondary,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Anda belum melakukan absensi',
+            style: TextStyle(
+              fontSize: 16,
+              color: _isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Anda belum melakukan absensi',
-              style: AppTextStyles.bodyMedium.copyWith(
-                color: AppColors.textTertiary,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildHistoryCard(Map<String, dynamic> absen, int index) {
     final status = absen['status'].toString();
-    final statusColor = AppColors.getStatusColor(status);
-    final statusLabel = AppColors.getStatusLabel(status);
+    final statusColor = _getStatusColor(status);
+    final statusLabel = _getStatusLabel(status);
+    final statusIcon = _getStatusIcon(status);
 
     return AnimatedBuilder(
       animation: _animationController,
@@ -179,17 +278,29 @@ class _HistoryScreenState extends State<HistoryScreen>
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: AppDecorations.cardDecoration,
-        child: CupertinoListTile(
-          padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _isDarkMode
+              ? AppColors.darkSurface
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
           leading: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: statusColor.withOpacity(0.1),
+              color: statusColor.withValues(alpha: _isDarkMode ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
-              CupertinoIcons.calendar,
+              statusIcon,
               color: statusColor,
               size: 24,
             ),
@@ -198,9 +309,10 @@ class _HistoryScreenState extends State<HistoryScreen>
             children: [
               Text(
                 statusLabel.toUpperCase(),
-                style: AppTextStyles.titleSmall.copyWith(
+                style: TextStyle(
                   color: statusColor,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
                 ),
               ),
               const SizedBox(width: 8),
@@ -209,12 +321,20 @@ class _HistoryScreenState extends State<HistoryScreen>
                   horizontal: 8,
                   vertical: 4,
                 ),
-                decoration: AppDecorations.statusBadgeDecoration(statusColor),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: statusColor.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
                 child: Text(
                   statusLabel,
-                  style: AppTextStyles.labelSmall.copyWith(
+                  style: TextStyle(
                     color: statusColor,
                     fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
                 ),
               ),
@@ -227,15 +347,22 @@ class _HistoryScreenState extends State<HistoryScreen>
               Row(
                 children: [
                   Icon(
-                    CupertinoIcons.location,
-                    size: 14,
-                    color: AppColors.textSecondary,
+                    Icons.location_on,
+                    size: 16,
+                    color: _isDarkMode
+                        ? AppColors.darkTextSecondary
+                        : AppColors.textSecondary,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       '${absen['latitude']}, ${absen['longitude']}',
-                      style: AppTextStyles.bodySmall,
+                      style: TextStyle(
+                        color: _isDarkMode
+                            ? AppColors.darkTextSecondary
+                            : AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -249,16 +376,21 @@ class _HistoryScreenState extends State<HistoryScreen>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Icon(
-                CupertinoIcons.clock,
-                size: 16,
-                color: AppColors.textSecondary,
+                Icons.access_time,
+                size: 18,
+                color: _isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.textSecondary,
               ),
               const SizedBox(height: 4),
               Text(
                 absen['waktu_absen'],
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.textPrimary,
+                style: TextStyle(
+                  color: _isDarkMode
+                      ? AppColors.darkTextPrimary
+                      : AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
+                  fontSize: 14,
                 ),
               ),
             ],
@@ -270,64 +402,109 @@ class _HistoryScreenState extends State<HistoryScreen>
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text(
-          'Riwayat Absensi',
-          style: AppTextStyles.titleMedium,
-        ),
-        backgroundColor: AppColors.cardBackground,
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.border,
-            width: 0.5,
+    return AnimatedBackground(
+      isDarkMode: _isDarkMode,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text(
+            'Riwayat Absensi',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(
+            color: Colors.white,
+          ),
+          actions: [
+            // Theme toggle button
+            _buildThemeToggle(),
+          ],
         ),
-      ),
-      child: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CupertinoActivityIndicator(radius: 20),
-              )
-            : _attendanceHistory.isEmpty
-                ? _buildEmptyState()
-                : RefreshIndicator(
-                    onRefresh: _handleRefresh,
-                    color: AppColors.primary,
-                    child: CustomScrollView(
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: SlideTransition(
-                              position: _slideAnimation,
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Text(
-                                  'Total Absensi: ${_attendanceHistory.length}',
-                                  style: AppTextStyles.labelLarge.copyWith(
-                                    color: AppColors.textSecondary,
+        body: SafeArea(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: _isDarkMode
+                        ? AppColors.darkAccent
+                        : AppColors.formalNavy,
+                  ),
+                )
+              : _attendanceHistory.isEmpty
+                  ? _buildEmptyState()
+                  : RefreshIndicator(
+                      onRefresh: _handleRefresh,
+                      color: _isDarkMode
+                          ? AppColors.darkAccent
+                          : AppColors.formalNavy,
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverToBoxAdapter(
+                            child: FadeTransition(
+                              opacity: _fadeAnimation,
+                              child: SlideTransition(
+                                position: _slideAnimation,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    'Total Absensi: ${_attendanceHistory.length}',
+                                    style: TextStyle(
+                                      color: _isDarkMode
+                                          ? AppColors.darkTextPrimary
+                                          : Colors.white70,
+                                      fontSize: 16,
+                                    ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                        SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              return _buildHistoryCard(
-                                _attendanceHistory[index],
-                                index,
-                              );
-                            },
-                            childCount: _attendanceHistory.length,
+                          SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) {
+                                return _buildHistoryCard(
+                                  _attendanceHistory[index],
+                                  index,
+                                );
+                              },
+                              childCount: _attendanceHistory.length,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeToggle() {
+    return Container(
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: _isDarkMode
+            ? AppColors.darkSurface.withValues(alpha: 0.8)
+            : Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(
+          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+          color: _isDarkMode
+              ? AppColors.darkTextPrimary
+              : Colors.white,
+        ),
+        onPressed: _toggleTheme,
+        tooltip: _isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       ),
     );
   }

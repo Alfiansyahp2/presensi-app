@@ -1,11 +1,22 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
-import 'package:flutter_absensi/service/API_config.dart';
-import 'package:flutter_absensi/utils/shared_storage.dart';
-import 'package:flutter_absensi/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../utils/shared_storage.dart';
+import '../core/widgets/animated_background.dart';
+import '../core/theme/app_colors.dart';
+import 'login_screen.dart';
 
+/// 🎨 Formal Profile Screen dengan Theme Support
+///
+/// Features:
+/// - Formal professional design
+/// - Light & Dark mode support
+/// - Animated gradient background
+/// - Profile information dengan animations
+/// - Theme toggle button
+/// - Logout functionality
+///
+/// Context: Aplikasi Presensi Sekolah Premium 2025-2026
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -14,9 +25,12 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   Map<String, dynamic>? _userProfile;
   bool _isLoading = true;
+  bool _isDarkMode = false;
+
+  // Animations
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -24,9 +38,21 @@ class _ProfileScreenState extends State<ProfileScreen>
   @override
   void initState() {
     super.initState();
+    _initAnimations();
     _fetchProfileData();
+    _loadThemePreference();
+  }
 
-    // Initialize animations
+  Future<void> _loadThemePreference() async {
+    final isDarkMode = await SharedStorage.getThemeMode();
+    if (mounted) {
+      setState(() {
+        _isDarkMode = isDarkMode;
+      });
+    }
+  }
+
+  void _initAnimations() {
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -49,6 +75,14 @@ class _ProfileScreenState extends State<ProfileScreen>
     _animationController.forward();
   }
 
+  void _toggleTheme() {
+    setState(() {
+      _isDarkMode = !_isDarkMode;
+    });
+    // Save theme preference
+    SharedStorage.saveThemeMode(_isDarkMode);
+  }
+
   @override
   void dispose() {
     _animationController.dispose();
@@ -59,12 +93,17 @@ class _ProfileScreenState extends State<ProfileScreen>
     try {
       final token = await SharedStorage.getToken();
       if (token == null) {
-        Navigator.pushReplacementNamed(context, '/login');
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
         return;
       }
 
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/profile'),
+        Uri.parse('http://localhost:8000/api/profile'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -75,10 +114,12 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (response.statusCode == 200) {
         final responseData = json.decode(utf8.decode(response.bodyBytes));
         if (responseData['success'] == true) {
-          setState(() {
-            _userProfile = responseData['data'];
-            _isLoading = false;
-          });
+          if (mounted) {
+            setState(() {
+              _userProfile = responseData['data'];
+              _isLoading = false;
+            });
+          }
           return;
         }
       }
@@ -89,44 +130,97 @@ class _ProfileScreenState extends State<ProfileScreen>
   }
 
   void _handleError(String message) {
-    showCupertinoDialog(
-      context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Error'),
-        content: Text(message),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('OK'),
-            onPressed: () => Navigator.of(context).pop(),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  message,
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
     setState(() {
       _isLoading = false;
     });
   }
 
   void _showLogoutDialog() {
-    showCupertinoDialog(
+    showDialog(
       context: context,
-      builder: (context) => CupertinoAlertDialog(
-        title: const Text('Keluar'),
-        content: const Text('Apakah Anda yakin ingin keluar?'),
-        actions: [
-          CupertinoDialogAction(
-            child: const Text('Batal'),
-            onPressed: () => Navigator.of(context).pop(),
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Keluar',
+          style: TextStyle(
+            color: _isDarkMode
+                ? AppColors.darkTextPrimary
+                : AppColors.textPrimary,
+            fontWeight: FontWeight.bold,
           ),
-          CupertinoDialogAction(
-            isDestructiveAction: true,
-            child: const Text('Keluar'),
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin keluar?',
+          style: TextStyle(
+            color: _isDarkMode
+                ? AppColors.darkTextSecondary
+                : AppColors.textSecondary,
+          ),
+        ),
+        backgroundColor: _isDarkMode
+            ? AppColors.darkSurface
+            : AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              'Batal',
+              style: TextStyle(
+                color: _isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+            ),
             onPressed: () async {
-              Navigator.of(context).pop();
+              final navigator = Navigator.of(context);
+              navigator.pop();
               await SharedStorage.clearAll();
-              if (!mounted) return;
-              Navigator.pushReplacementNamed(context, '/login');
+              if (mounted) {
+                navigator.pushReplacement(
+                  MaterialPageRoute(
+                    builder: (context) => const LoginScreen(),
+                  ),
+                );
+              }
             },
+            child: const Text(
+              'Keluar',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -141,11 +235,26 @@ class _ProfileScreenState extends State<ProfileScreen>
         child: Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
+            gradient: LinearGradient(
+              colors: _isDarkMode
+                  ? [
+                      AppColors.darkAccent,
+                      AppColors.darkAccent.withValues(alpha: 0.7),
+                    ]
+                  : [
+                      AppColors.formalNavy,
+                      AppColors.formalNavyLight,
+                    ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.3),
+                color: (_isDarkMode
+                        ? AppColors.darkAccent
+                        : AppColors.formalNavy)
+                    .withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -165,21 +274,21 @@ class _ProfileScreenState extends State<ProfileScreen>
                       shape: BoxShape.circle,
                       gradient: LinearGradient(
                         colors: [
-                          AppColors.textLight.withOpacity(0.3),
-                          AppColors.textLight.withOpacity(0.1),
+                          Colors.white.withValues(alpha: 0.3),
+                          Colors.white.withValues(alpha: 0.1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       border: Border.all(
-                        color: AppColors.textLight.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         width: 3,
                       ),
                     ),
                     child: const Icon(
-                      CupertinoIcons.person_fill,
+                      Icons.person,
                       size: 45,
-                      color: AppColors.textLight,
+                      color: Colors.white,
                     ),
                   ),
                 ),
@@ -187,9 +296,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 // Name
                 Text(
                   _userProfile?['fullname'] ?? 'Nama Pengguna',
-                  style: AppTextStyles.headlineSmall.copyWith(
-                    color: AppColors.textLight,
+                  style: TextStyle(
+                    color: Colors.white,
                     fontWeight: FontWeight.bold,
+                    fontSize: 24,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -201,18 +311,19 @@ class _ProfileScreenState extends State<ProfileScreen>
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.textLight.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: AppColors.textLight.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
                   child: Text(
                     _userProfile?['kelas'] ?? 'Kelas',
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      color: AppColors.textLight,
+                    style: TextStyle(
+                      color: Colors.white,
                       fontWeight: FontWeight.w500,
+                      fontSize: 14,
                     ),
                   ),
                 ),
@@ -257,29 +368,56 @@ class _ProfileScreenState extends State<ProfileScreen>
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: AppDecorations.cardDecoration,
-        child: CupertinoListTile(
-          padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _isDarkMode
+              ? AppColors.darkSurface
+              : AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: (_isDarkMode
+                      ? AppColors.darkAccent
+                      : AppColors.formalNavy)
+                  .withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               icon,
-              color: AppColors.primary,
+              color: _isDarkMode
+                  ? AppColors.darkAccent
+                  : AppColors.formalNavy,
               size: 22,
             ),
           ),
           title: Text(
             label,
-            style: AppTextStyles.labelLarge,
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           subtitle: Text(
             value,
-            style: AppTextStyles.bodyLarge.copyWith(
-              fontWeight: FontWeight.w500,
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
             ),
           ),
         ),
@@ -289,128 +427,187 @@ class _ProfileScreenState extends State<ProfileScreen>
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoPageScaffold(
-      backgroundColor: AppColors.background,
-      navigationBar: CupertinoNavigationBar(
-        middle: const Text(
-          'Profil Saya',
-          style: AppTextStyles.titleMedium,
-        ),
-        backgroundColor: AppColors.cardBackground,
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.border,
-            width: 0.5,
+    return AnimatedBackground(
+      isDarkMode: _isDarkMode,
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text(
+            'Profil Saya',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          iconTheme: const IconThemeData(
+            color: Colors.white,
+          ),
+          actions: [
+            // Theme toggle button
+            _buildThemeToggle(),
+          ],
         ),
-      ),
-      child: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CupertinoActivityIndicator(radius: 20),
-              )
-            : SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 8),
-                    // Profile Header with Gradient
-                    _buildProfileHeader(),
+        body: SafeArea(
+          child: _isLoading
+              ? Center(
+                  child: CircularProgressIndicator(
+                    color: _isDarkMode
+                        ? AppColors.darkAccent
+                        : AppColors.formalNavy,
+                  ),
+                )
+              : SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 8),
+                      // Profile Header with Gradient
+                      _buildProfileHeader(),
 
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                    // Info Section Title
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Text(
-                        'Informasi Pribadi',
-                        style: AppTextStyles.titleSmall.copyWith(
-                          color: AppColors.textSecondary,
+                      // Info Section Title
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          'Informasi Pribadi',
+                          style: TextStyle(
+                            color: _isDarkMode
+                                ? AppColors.darkTextSecondary
+                                : Colors.white70,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    // Profile Information Items
-                    _buildProfileItem(
-                      icon: CupertinoIcons.person_circle,
-                      label: 'NISN',
-                      value: _userProfile?['nisn'] ?? '-',
-                      index: 0,
-                    ),
-                    _buildProfileItem(
-                      icon: CupertinoIcons.building_2_fill,
-                      label: 'Kelas',
-                      value: _userProfile?['kelas'] ?? '-',
-                      index: 1,
-                    ),
-                    _buildProfileItem(
-                      icon: CupertinoIcons.mail,
-                      label: 'Email',
-                      value: _userProfile?['email'] ?? '-',
-                      index: 2,
-                    ),
+                      // Profile Information Items
+                      _buildProfileItem(
+                        icon: Icons.badge,
+                        label: 'NISN',
+                        value: _userProfile?['nisn'] ?? '-',
+                        index: 0,
+                      ),
+                      _buildProfileItem(
+                        icon: Icons.school,
+                        label: 'Kelas',
+                        value: _userProfile?['kelas'] ?? '-',
+                        index: 1,
+                      ),
+                      _buildProfileItem(
+                        icon: Icons.email,
+                        label: 'Email',
+                        value: _userProfile?['email'] ?? '-',
+                        index: 2,
+                      ),
 
-                    const SizedBox(height: 32),
+                      const SizedBox(height: 32),
 
-                    // Logout Button
-                    AnimatedBuilder(
-                      animation: _animationController,
-                      builder: (context, child) {
-                        final logoutAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-                          CurvedAnimation(
-                            parent: _animationController,
-                            curve: const Interval(
-                              0.6,
-                              1.0,
-                              curve: Curves.easeOutCubic,
+                      // Logout Button
+                      AnimatedBuilder(
+                        animation: _animationController,
+                        builder: (context, child) {
+                          final logoutAnimation =
+                              Tween<double>(begin: 0.0, end: 1.0).animate(
+                            CurvedAnimation(
+                              parent: _animationController,
+                              curve: const Interval(
+                                0.6,
+                                1.0,
+                                curve: Curves.easeOutCubic,
+                              ),
+                            ),
+                          );
+
+                          return FadeTransition(
+                            opacity: logoutAnimation,
+                            child: SlideTransition(
+                              position: Tween<Offset>(
+                                begin: const Offset(0, 0.3),
+                                end: Offset.zero,
+                              ).animate(logoutAnimation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              onPressed: _showLogoutDialog,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.logout,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Keluar',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        );
-
-                        return FadeTransition(
-                          opacity: logoutAnimation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.3),
-                              end: Offset.zero,
-                            ).animate(logoutAnimation),
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: CupertinoButton(
-                          color: AppColors.error,
-                          borderRadius: BorderRadius.circular(12),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          onPressed: _showLogoutDialog,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                CupertinoIcons.arrow_right_square,
-                                color: AppColors.textLight,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Keluar',
-                                style: AppTextStyles.buttonLarge,
-                              ),
-                            ],
-                          ),
                         ),
                       ),
-                    ),
 
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
-              ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeToggle() {
+    return Container(
+      margin: const EdgeInsets.only(right: 16),
+      decoration: BoxDecoration(
+        color: _isDarkMode
+            ? AppColors.darkSurface.withValues(alpha: 0.8)
+            : Colors.white.withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: IconButton(
+        icon: Icon(
+          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+          color: _isDarkMode
+              ? AppColors.darkTextPrimary
+              : Colors.white,
+        ),
+        onPressed: _toggleTheme,
+        tooltip:
+            _isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       ),
     );
   }
