@@ -1,28 +1,34 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 import '../utils/shared_storage.dart';
 import '../core/widgets/animated_background.dart';
 import '../core/theme/app_colors.dart';
+import '../api/absensi_api.dart';
+import '../models/attendance_status_model.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 
-/// 🎨 Formal Home Screen dengan Theme Support
+/// 🎯 Home Screen dengan Multi-Tenant Backend Integration
 ///
 /// Features:
-/// - Formal professional design
-/// - Light & Dark mode support
-/// - Interactive map dengan location tracking
-/// - GPS-based attendance validation (50m radius)
-/// - Real-time status updates
-/// - Theme toggle button
-/// - Smooth animations
+/// - ✅ Integrasi backend multi-tenant (GET /api/absensi/today)
+/// - ✅ 2 tombol terpisah (Masuk & Pulang)
+/// - ✅ Status otomatis dari server (HADIR/TERLAMBAT/PULANG)
+/// - ✅ Foto absensi (check-in & check-out)
+/// - ✅ School config dari backend (jam, radius)
+/// - ✅ Light & Dark mode support
 ///
-/// Context: Aplikasi Presensi Sekolah Premium 2025-2026
+/// API Integration:
+/// - GET /api/absensi/today → untuk tentukan tombol aktif
+/// - POST /api/absensi/checkin → absen masuk + foto
+/// - POST /api/absensi/checkout → absen pulang + foto
+///
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -32,38 +38,132 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
+  // 📍 Location
   LatLng? _currentPosition;
-  bool _hasAbsenToday = false;
+
+  // 📊 Status dari Backend
+  AttendanceStatus? _attendanceStatus;
+  SchoolInfo? _schoolInfo;
+
+  // ⏰ Real-time Clock
+  DateTime? _currentTime;
+
+  // ⚙️ State
   bool _isDarkMode = false;
   bool _isLoading = false;
+  bool _isLoadingLocation = false;
+  bool _isSubmitting = false;
 
-  // Getter untuk menghitung isInRadius secara real-time
-  bool get _isInRadius {
-    if (_currentPosition == null) return false;
-    return _checkIsInRadius(_currentPosition!, _targetLocation, 50);
-  }
-
-  // Animations
+  // 🎨 Animation
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _slideAnimation;
 
-  // School location for attendance validation
-  // TODO: Configure this with your school's location
-  // Get coordinates from: https://www.google.com/maps
-  final LatLng _targetLocation = const LatLng(
-    -7.32787262808773,  // TODO: Replace with your school's latitude
-    112.79426795133186,  // TODO: Replace with your school's longitude
-  ); // Your school name and address
+  // ⏰ Timer untuk real-time clock
+  Timer? _clockTimer;
+
+  // 📷 Camera
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
+    _currentTime = DateTime.now();
     _initAnimations();
-    _checkAbsenToday();
-    _determinePosition();
+    _loadData();
     _loadThemePreference();
+    _startClock();
+  }
+
+  /// ⏰ START CLOCK - Real-time clock update setiap detik
+  void _startClock() {
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _currentTime = DateTime.now();
+        });
+      }
+    });
+  }
+
+  /// 📥 LOAD DATA - Load status hari ini & location
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    await Future.wait([
+      _loadTodayStatus(),
+      _determinePosition(),
+    ]);
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+      _fadeController.forward();
+    }
+  }
+
+  /// ✅ GET TODAY STATUS - Ambil status hari ini dari backend
+  Future<void> _loadTodayStatus() async {
+    try {
+      final token = await SharedStorage.getToken();
+      if (token == null) {
+        if (mounted) _navigateToLogin();
+        return;
+      }
+
+      final result = await AbsensiApi.getTodayStatus(token: token);
+
+      if (result['success'] == true && mounted) {
+        final status = result['data'] as AttendanceStatus;
+        setState(() {
+          _attendanceStatus = status;
+          _schoolInfo = status.school;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading today status: $e');
+    }
+  }
+
+  /// 📍 GET LOCATION - Deteksi lokasi user
+  Future<void> _determinePosition() async {
+    setState(() => _isLoadingLocation = true);
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('Location service disabled');
+        setState(() => _isLoadingLocation = false);
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.always &&
+            permission != LocationPermission.whileInUse) {
+          debugPrint('Location permission denied');
+          setState(() => _isLoadingLocation = false);
+          return;
+        }
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      debugPrint('Position: ${position.latitude}, ${position.longitude}');
+
+      if (mounted) {
+        setState(() {
+          _currentPosition = LatLng(position.latitude, position.longitude);
+          _isLoadingLocation = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      setState(() => _isLoadingLocation = false);
+    }
   }
 
   Future<void> _loadThemePreference() async {
@@ -113,124 +213,199 @@ class _HomeScreenState extends State<HomeScreen>
     setState(() {
       _isDarkMode = !_isDarkMode;
     });
-    // Save theme preference
     SharedStorage.saveThemeMode(_isDarkMode);
   }
 
   @override
   void dispose() {
+    _clockTimer?.cancel(); // Stop real-time clock
     _fadeController.dispose();
     super.dispose();
   }
 
-  Future<void> _checkAbsenToday() async {
-    final hasAbsen = await SharedStorage.hasAbsenToday();
-    if (mounted) {
-      setState(() {
-        _hasAbsenToday = hasAbsen;
-      });
+  /// ✅ CHECK-IN - Absen masuk dengan foto
+  Future<void> _handleCheckIn() async {
+    if (_currentPosition == null) {
+      _showError('Lokasi belum terdeteksi');
+      return;
     }
-  }
 
-  Future<void> _determinePosition() async {
+    // Pilih foto dulu
+    final image = await _pickImage(ImageSource.camera);
+    if (image == null) return;
+
+    setState(() => _isSubmitting = true);
+
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        debugPrint('Location service disabled');
-        setState(() {
-          _currentPosition = _targetLocation;
-        });
-        _fadeController.forward();
+      final token = await SharedStorage.getToken();
+      if (token == null) {
+        if (mounted) _navigateToLogin();
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        permission = await Geolocator.requestPermission();
-        if (permission != LocationPermission.always &&
-            permission != LocationPermission.whileInUse) {
-          debugPrint('Location permission denied');
-          setState(() {
-            _currentPosition = _targetLocation;
-          });
-          _fadeController.forward();
-          return;
-        }
-      }
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      final result = await AbsensiApi.checkIn(
+        token: token,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
+        foto: image,
       );
 
-      debugPrint('Position detected: ${position.latitude}, ${position.longitude}');
-
-      setState(() {
-        _currentPosition = LatLng(position.latitude, position.longitude);
-      });
-
-      _fadeController.forward();
+      if (mounted) {
+        if (result['success'] == true) {
+          _showSuccessDialog(
+            'Absen Masuk Berhasil!',
+            'Status: ${result['data']?.status ?? "HADIR"}',
+          );
+          // Refresh status
+          await _loadTodayStatus();
+        } else {
+          _showError(result['message'] ?? 'Gagal absen masuk');
+        }
+      }
     } catch (e) {
-      debugPrint('Error getting location: $e');
-      setState(() {
-        _currentPosition = _targetLocation;
-      });
-      _fadeController.forward();
+      debugPrint('Error check-in: $e');
+      if (mounted) {
+        _showError('Terjadi kesalahan. Silakan coba lagi.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
-  bool _checkIsInRadius(LatLng current, LatLng target, double radiusMeter) {
-    final distance = Geolocator.distanceBetween(
-      current.latitude,
-      current.longitude,
-      target.latitude,
-      target.longitude,
-    );
-    return distance <= radiusMeter;
+  /// ✅ CHECK-OUT - Absen pulang dengan foto
+  Future<void> _handleCheckOut() async {
+    // Pilih foto dulu
+    final image = await _pickImage(ImageSource.camera);
+    if (image == null) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      final token = await SharedStorage.getToken();
+      if (token == null) {
+        if (mounted) _navigateToLogin();
+        return;
+      }
+
+      final result = await AbsensiApi.checkOut(
+        token: token,
+        foto: image,
+      );
+
+      if (mounted) {
+        if (result['success'] == true) {
+          _showSuccessDialog(
+            'Absen Pulang Berhasil!',
+            'Hati-hati di jalan! 🙏',
+          );
+          // Refresh status
+          await _loadTodayStatus();
+        } else {
+          _showError(result['message'] ?? 'Gagal absen pulang');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error check-out: $e');
+      if (mounted) {
+        _showError('Terjadi kesalahan. Silakan coba lagi.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 
-  void _showDialog({
-    required String title,
-    required String content,
-    String? actionText,
-    VoidCallback? onAction,
-  }) {
+  /// 📷 PICK IMAGE - Pilih foto dari camera
+  Future<File?> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 80,
+        maxWidth: 800,
+        maxHeight: 800,
+      );
+
+      if (pickedFile != null) {
+        return File(pickedFile.path);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        _showError('Gagal mengambil foto');
+      }
+      return null;
+    }
+  }
+
+  /// 📏 CHECK RADIUS - Cek apakah dalam radius
+  bool _isInRadius() {
+    // TODO: Hitung jarak ke school location
+    // Untuk sekarang, asumsi in radius
+    return true;
+  }
+
+  /// 📅 FORMAT TANGGAL - dd-mm-yyyy
+  String _formatDate_ddMMyyyy(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    final year = date.year;
+    return '$day-$month-$year';
+  }
+
+  void _navigateToLogin() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+  void _showSuccessDialog(String title, String message) {
     showDialog(
       context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(
-          title,
-          style: TextStyle(
-            color: _isDarkMode
-                ? AppColors.darkTextPrimary
-                : AppColors.textPrimary,
-            fontWeight: FontWeight.bold,
-          ),
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        backgroundColor: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.formalGreen),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: TextStyle(
+                color: _isDarkMode
+                    ? AppColors.darkTextPrimary
+                    : AppColors.textPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
         content: Text(
-          content,
+          message,
           style: TextStyle(
             color: _isDarkMode
                 ? AppColors.darkTextSecondary
                 : AppColors.textSecondary,
           ),
         ),
-        backgroundColor:
-            _isDarkMode ? AppColors.darkSurface : AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
         actions: [
-          if (actionText != null && onAction != null)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                onAction();
-              },
-              child: Text(actionText),
-            ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
           ),
         ],
@@ -238,112 +413,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Future<void> _submitAbsen() async {
-    if (_currentPosition == null) return;
-
-    final token = await SharedStorage.getToken();
-    if (token == null) {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => const LoginScreen(),
-        ),
-      );
-      return;
-    }
-
-    if (!_isInRadius) {
-      _showDialog(
-        title: 'Di Luar Radius',
-        content:
-            'Anda berada di luar radius absen (50 meter). Silakan mendekat ke lokasi absen.',
-      );
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-    });
-
-    try {
-      final response = await http.post(
-        Uri.parse('http://localhost:8000/api/absen'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({
-          'latitude': _currentPosition!.latitude,
-          'longitude': _currentPosition!.longitude,
-          'status': 'hadir',
-        }),
-      );
-
-      final responseData = json.decode(utf8.decode(response.bodyBytes));
-
-      if (!mounted) return;
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (responseData['success'] == true) {
-          await SharedStorage.saveLastAbsenDate(
-            DateTime.now().toIso8601String(),
-          );
-
-          if (!mounted) return;
-          setState(() {
-            _hasAbsenToday = true;
-            _isLoading = false;
-          });
-
-          _showDialog(
-            title: 'Absen Berhasil!',
-            content: 'Waktu: ${DateTime.now().toString().substring(0, 19)}',
-            actionText: 'Lihat Riwayat',
-            onAction: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const HistoryScreen(),
-                ),
-              );
-            },
-          );
-        } else {
-          setState(() {
-            _isLoading = false;
-          });
-          _showDialog(
-            title: 'Gagal',
-            content: responseData['message'] ?? 'Terjadi kesalahan',
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('Error in _submitAbsen: $e');
-      setState(() {
-        _isLoading = false;
-      });
-      if (mounted) {
-        _showDialog(
-          title: 'Error',
-          content:
-              'Gagal menghubungi server. Silakan cek koneksi internet Anda.',
-        );
-      }
-    } finally {
-      if (mounted && _isLoading) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final content = _currentPosition == null
+    final content = _isLoading || _attendanceStatus == null
         ? _buildLoadingScreen()
         : FadeTransition(
             opacity: _fadeAnimation,
@@ -353,21 +425,25 @@ class _HomeScreenState extends State<HomeScreen>
                 end: Offset.zero,
               ).animate(_fadeController),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Map Card with Scale Animation
-                    ScaleTransition(
-                      scale: _scaleAnimation,
-                      child: _buildMapCard(),
-                    ),
+                    // 🏫 School Info Card
+                    if (_schoolInfo != null) _buildSchoolInfoCard(),
                     const SizedBox(height: 20),
-                    // Location Info
-                    _buildLocationInfo(),
+
+                    // 📊 Status Card
+                    _buildStatusCard(),
                     const SizedBox(height: 20),
-                    // Absen Button
-                    _buildAbsenButton(),
+
+                    // 🗺️ Map Card
+                    if (_currentPosition != null) _buildMapCard(),
+                    const SizedBox(height: 20),
+
+                    // 🎯 Action Buttons (2 TOMBOL)
+                    _buildActionButtons(),
                   ],
                 ),
               ),
@@ -391,7 +467,11 @@ class _HomeScreenState extends State<HomeScreen>
           elevation: 0,
           iconTheme: const IconThemeData(color: Colors.white),
           actions: [
-            // History button
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+              onPressed: _loadData,
+            ),
             IconButton(
               icon: const Icon(Icons.history),
               tooltip: 'Riwayat',
@@ -404,7 +484,6 @@ class _HomeScreenState extends State<HomeScreen>
                 );
               },
             ),
-            // Profile button
             IconButton(
               icon: const Icon(Icons.person),
               tooltip: 'Profil',
@@ -428,12 +507,12 @@ class _HomeScreenState extends State<HomeScreen>
     return Container(
       decoration: BoxDecoration(
         color: _isDarkMode
-            ? AppColors.darkSurface.withValues(alpha: 0.8)
-            : Colors.white.withValues(alpha: 0.8),
+            ? AppColors.darkSurface.withOpacity(0.8)
+            : Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
           ),
         ],
@@ -463,7 +542,7 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           const SizedBox(height: 20),
           Text(
-            'Mendeteksi lokasi...',
+            'Memuat data...',
             style: TextStyle(
               color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
               fontSize: 16,
@@ -474,11 +553,34 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  Widget _buildMapCard() {
+  /// 🏫 SCHOOL INFO CARD - Logo, nama, tanggal real-time, jam masuk/pulang
+  Widget _buildSchoolInfoCard() {
+    if (_currentTime == null) {
+      return const SizedBox.shrink();
+    }
+
     return Container(
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _isDarkMode
+              ? [
+                  AppColors.darkSurface,
+                  AppColors.darkSurface.withValues(alpha: 0.8),
+                ]
+              : [
+                  AppColors.surface,
+                  AppColors.surface.withValues(alpha: 0.9),
+                ],
+        ),
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+              .withValues(alpha: 0.3),
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -487,270 +589,568 @@ class _HomeScreenState extends State<HomeScreen>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: 320,
-          child: FlutterMap(
-            options: MapOptions(
-              initialCenter: _currentPosition!,
-              initialZoom: 17,
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all,
-              ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate:
-                    'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
-                userAgentPackageName: 'com.example.mobile_absen',
-              ),
-              MarkerLayer(
-                markers: [
-                  // Current location marker
-                  Marker(
-                    point: _currentPosition!,
-                    width: 60,
-                    height: 60,
-                    child: Icon(
-                      Icons.my_location,
-                      color: _isInRadius ? AppColors.formalGreen : AppColors.error,
-                      size: 48,
-                    ),
-                  ),
-                  // Target school marker
-                  Marker(
-                    point: _targetLocation,
-                    width: 40,
-                    height: 40,
-                    child: Icon(
-                      Icons.school,
-                      color: AppColors.formalNavy,
-                      size: 36,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationInfo() {
-    // Format tanggal hari ini
-    final now = DateTime.now();
-    final todayDate = '${now.day}/${now.month}/${now.year}';
-    final weekdays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
-    final todayName = weekdays[now.weekday - 1];
-
-    double distance = _currentPosition != null
-        ? Geolocator.distanceBetween(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-            _targetLocation.latitude,
-            _targetLocation.longitude,
-          )
-        : 0.0;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _isInRadius ? AppColors.formalGreen : AppColors.error,
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status Header
+          // 🏫 LOGO & NAMA SEKOLAH + TANGGAL REAL-TIME
           Row(
             children: [
+              // Logo Sekolah
               Container(
-                padding: const EdgeInsets.all(10),
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: (_isInRadius ? AppColors.formalGreen : AppColors.error)
-                      .withValues(alpha: _isDarkMode ? 0.2 : 0.1),
+                  color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+                      .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+                        .withValues(alpha: 0.3),
+                    width: 2,
+                  ),
                 ),
                 child: Icon(
-                  _isInRadius ? Icons.check_circle : Icons.info_outline,
-                  color: _isInRadius ? AppColors.formalGreen : AppColors.error,
-                  size: 24,
+                  Icons.school,
+                  color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
+                  size: 32,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 16),
+
+              // Nama Sekolah & Tanggal
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Nama Sekolah
                     Text(
-                      _isInRadius ? 'ANDA DALAM RADIUS' : 'DI LUAR RADIUS',
+                      _schoolInfo!.namaSekolah,
                       style: TextStyle(
-                        color: _isInRadius ? AppColors.formalGreen : AppColors.error,
+                        color: _isDarkMode
+                            ? AppColors.darkTextPrimary
+                            : AppColors.textPrimary,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        fontSize: 16,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Jarak: ${distance.toStringAsFixed(1)} meter dari lokasi',
-                      style: TextStyle(
-                        color: _isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
+                    const SizedBox(height: 4),
+
+                    // Tanggal Real-Time (dd-mm-yyyy)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.calendar_today,
+                          size: 14,
+                          color: _isDarkMode
+                              ? AppColors.darkAccent
+                              : AppColors.formalNavy,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatDate_ddMMyyyy(_currentTime!),
+                          style: TextStyle(
+                            color: _isDarkMode
+                                ? AppColors.darkTextSecondary
+                                : AppColors.textSecondary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Date Info
+          const SizedBox(height: 24),
+
+          // Divider
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
-                  .withValues(alpha: _isDarkMode ? 0.2 : 0.1),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
-                    .withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
+            height: 1,
+            color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+                .withValues(alpha: 0.2),
+          ),
+          const SizedBox(height: 24),
+
+          // Waktu Masuk & Pulang (Grid dengan hh:mm:ss)
+          IntrinsicHeight(
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.calendar_today,
-                  color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
-                  size: 16,
+                // 🕐 JAM MASUK (hh:mm:ss)
+                Expanded(
+                  child: _buildTimeCard(
+                    icon: Icons.login,
+                    label: 'Masuk',
+                    time: _schoolInfo!.formattedJamMasuk,
+                    color: AppColors.formalGreen,
+                  ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '$todayName, $todayDate',
-                  style: TextStyle(
-                    color: _isDarkMode ? AppColors.darkTextPrimary : AppColors.formalNavy,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
+                const SizedBox(width: 16),
+
+                // Container divider vertical
+                Container(
+                  width: 1,
+                  color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+                      .withValues(alpha: 0.2),
+                ),
+                const SizedBox(width: 16),
+
+                // 🕑 JAM PULANG (hh:mm:ss)
+                Expanded(
+                  child: _buildTimeCard(
+                    icon: Icons.logout,
+                    label: 'Pulang',
+                    time: _schoolInfo!.formattedJamPulang,
+                    color: Colors.orange,
                   ),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 12),
-          // Divider
-          Container(
-            height: 1,
-            color: _isDarkMode
-                ? AppColors.darkTextSecondary.withValues(alpha: 0.2)
-                : AppColors.border.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 12),
-          // Current Location
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  _currentPosition != null
-                      ? 'Lat: ${_currentPosition!.latitude.toStringAsFixed(6)}, Lng: ${_currentPosition!.longitude.toStringAsFixed(6)}'
-                      : 'Lokasi tidak terdeteksi',
-                  style: TextStyle(
-                    color: _isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          // Target Location
-          Row(
-            children: [
-              Icon(
-                Icons.school,
-                color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  'School Location - Configure in home_screen.dart',
-                  style: TextStyle(
-                    color: _isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
-                    fontSize: 14,
-                  ),
-                  textAlign: TextAlign.left,
-                ),
-              ),
-            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildAbsenButton() {
-    // Cek apakah tombol harus disabled
-    bool isButtonDisabled = !_isInRadius || _hasAbsenToday || _isLoading;
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: isButtonDisabled ? null : _submitAbsen,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isButtonDisabled
-              ? (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textTertiary)
-              : (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy),
-          foregroundColor: _isDarkMode ? AppColors.darkTextPrimary : Colors.white,
-          disabledBackgroundColor: _isDarkMode ? AppColors.darkSurface : AppColors.surfaceVariant,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+  /// 🕐 TIME CARD - Kartu waktu minimalis
+  Widget _buildTimeCard({
+    required IconData icon,
+    required String label,
+    required String time,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 32,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(
+            color: _isDarkMode
+                ? AppColors.darkTextSecondary
+                : AppColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        const SizedBox(height: 4),
+        Text(
+          time,
+          style: TextStyle(
+            color: color,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 📊 STATUS CARD - Menampilkan status Masuk & Pulang
+  Widget _buildStatusCard() {
+    final status = _attendanceStatus!;
+    final attendance = status.attendance;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: _isDarkMode
+              ? [
+                  AppColors.darkSurface,
+                  AppColors.darkSurface.withValues(alpha: 0.8),
+                ]
+              : [
+                  AppColors.surface,
+                  AppColors.surface.withValues(alpha: 0.95),
+                ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+              .withValues(alpha: 0.2),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Text(
+            'Status Hari Ini',
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Grid 2 Kolom: Masuk | Pulang
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 🟢 ABSEN MASUK
+                Expanded(
+                  child: _buildAttendanceStatusCard(
+                    type: 'Masuk',
+                    status: _getCheckInStatus(attendance),
+                    time: attendance?.jamMasuk,
+                    distance: attendance?.jarakMeter,
+                    icon: Icons.login,
+                    color: AppColors.formalGreen,
+                  ),
+                ),
+
+                const SizedBox(width: 16),
+
+                // Container divider vertical
+                Container(
+                  width: 1,
+                  color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+                      .withValues(alpha: 0.2),
+                ),
+
+                const SizedBox(width: 16),
+
+                // 🟠 ABSEN PULANG
+                Expanded(
+                  child: _buildAttendanceStatusCard(
+                    type: 'Pulang',
+                    status: _getCheckOutStatus(attendance),
+                    time: attendance?.jamPulang,
+                    distance: null,
+                    icon: Icons.logout,
+                    color: Colors.orange,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 📋 KARTU STATUS (Masuk/Pulang) - Individual card
+  Widget _buildAttendanceStatusCard({
+    required String type,
+    required String status,
+    required String? time,
+    required int? distance,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Icon + Label
+        Row(
           children: [
             Icon(
-              _hasAbsenToday
-                  ? Icons.check_circle
-                  : (_isInRadius ? Icons.check_circle : Icons.location_off),
-              color: _isDarkMode ? AppColors.darkTextPrimary : Colors.white,
-              size: 24,
+              icon,
+              color: color,
+              size: 28,
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             Text(
-              _hasAbsenToday
-                  ? 'SUDAH ABSEN HARI INI'
-                  : (_isInRadius ? 'ABSEN SEKARANG' : 'DI LUAR RADIUS - TIDAK BISA ABSEN'),
+              type,
               style: TextStyle(
-                color: _isDarkMode ? AppColors.darkTextPrimary : Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
+                color: _isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
+        const SizedBox(height: 12),
+
+        // Status Badge
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: color.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Text(
+            status,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Details
+        _buildStatusDetail(label: 'Jam', value: time ?? '-'),
+        if (distance != null) _buildStatusDetail(label: 'Jarak', value: '${distance}m'),
+      ],
+    );
+  }
+
+  /// 📝 DETAIL ROW (Label: Value)
+  Widget _buildStatusDetail({required String label, required String value}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ✅ GET CHECK-IN STATUS (Masuk)
+  String _getCheckInStatus(AttendanceData? attendance) {
+    if (attendance == null) return 'BELUM';
+    if (attendance.jamMasuk == null) return 'BELUM';
+
+    // Status dari attendance
+    final status = attendance.status?.toUpperCase() ?? 'BELUM';
+    if (status == 'HADIR' || status == 'TERLAMBAT') {
+      return status;
+    }
+    return 'BELUM';
+  }
+
+  /// ✅ GET CHECK-OUT STATUS (Pulang)
+  String _getCheckOutStatus(AttendanceData? attendance) {
+    if (attendance == null) return 'BELUM';
+    if (attendance.jamPulang != null) return 'PULANG';
+    if (attendance.status?.toUpperCase() == 'PULANG') return 'PULANG';
+
+    // Jika sudah check-in tapi belum check-out
+    if (attendance.jamMasuk != null) return 'MENUNGGU';
+
+    return 'BELUM';
+  }
+
+  /// 🗺️ MAP CARD
+  Widget _buildMapCard() {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: Container(
+        decoration: BoxDecoration(
+          color: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: SizedBox(
+            height: 320,
+            child: FlutterMap(
+              options: MapOptions(
+                initialCenter: _currentPosition!,
+                initialZoom: 17,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate:
+                      'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  subdomains: const ['a', 'b', 'c'],
+                  userAgentPackageName: 'com.example.mobile_absen',
+                ),
+                MarkerLayer(
+                  markers: [
+                    // Current location marker
+                    Marker(
+                      point: _currentPosition!,
+                      width: 60,
+                      height: 60,
+                      child: Icon(
+                        Icons.my_location,
+                        color: _isInRadius() ? AppColors.formalGreen : AppColors.error,
+                        size: 48,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 🎯 ACTION BUTTONS - 2 TOMBOL (MASUK & PULANG)
+  Widget _buildActionButtons() {
+    final status = _attendanceStatus!;
+
+    // Jika sudah selesai (PULANG), tidak ada tombol
+    if (status.isSelesai) {
+      return _buildCompletedCard();
+    }
+
+    return Column(
+      children: [
+        // 🟢 TOMBOL ABSEN MASUK
+        if (status.canCheckIn)
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _handleCheckIn,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.login, size: 24),
+              label: Text(
+                _isSubmitting ? 'Memproses...' : 'ABSEN MASUK',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.formalGreen,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.formalGreen.withOpacity(0.5),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+
+        // 🟠 TOMBOL ABSEN PULANG
+        if (status.canCheckOut) ...[
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _isSubmitting ? null : _handleCheckOut,
+              icon: _isSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Icon(Icons.logout, size: 24),
+              label: Text(
+                _isSubmitting ? 'Memproses...' : 'ABSEN PULANG',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w600),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.orange.withOpacity(0.5),
+                padding: const EdgeInsets.symmetric(vertical: 18),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildCompletedCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.formalGreen.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.formalGreen.withOpacity(0.5),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.check_circle,
+            color: AppColors.formalGreen,
+            size: 48,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Selesai!',
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Anda sudah menyelesaikan absensi hari ini.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }

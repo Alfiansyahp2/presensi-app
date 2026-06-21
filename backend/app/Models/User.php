@@ -23,7 +23,22 @@ class User extends Authenticatable
         'kelas',
         'email',
         'password',
+        'school_id',
     ];
 
-    
+    /**
+     * Relasi ke sekolah
+     */
+    public function school()
+    {
+        return $this->belongsTo(School::class);
+    }
+
+    /**
+     * Relasi ke absensi
+     */
+    public function attendances()
+    {
+        return $this->hasMany(Absensi::class, 'user_id');
+    }
 }
