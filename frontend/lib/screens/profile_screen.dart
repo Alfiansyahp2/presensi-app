@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_absensi/service/API_config.dart';
 import 'package:flutter_absensi/utils/shared_storage.dart';
+import 'package:flutter_absensi/theme/app_theme.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
@@ -11,16 +13,46 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   Map<String, dynamic>? _userProfile;
   bool _isLoading = true;
-  final _primaryColor = const Color(0xFF1976D2);
-  final _secondaryColor = const Color(0xFF42A5F5);
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
     _fetchProfileData();
+
+    // Initialize animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOutCubic,
+      ),
+    );
+
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchProfileData() async {
@@ -57,10 +89,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _handleError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Error'),
         content: Text(message),
-        backgroundColor: Colors.red,
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
     setState(() {
@@ -68,172 +107,311 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
   }
 
-  Widget _buildProfileItem(IconData icon, String label, String value) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 2,
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+  void _showLogoutDialog() {
+    showCupertinoDialog(
+      context: context,
+      builder: (context) => CupertinoAlertDialog(
+        title: const Text('Keluar'),
+        content: const Text('Apakah Anda yakin ingin keluar?'),
+        actions: [
+          CupertinoDialogAction(
+            child: const Text('Batal'),
+            onPressed: () => Navigator.of(context).pop(),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: _primaryColor, size: 24),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
+          CupertinoDialogAction(
+            isDestructiveAction: true,
+            child: const Text('Keluar'),
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await SharedStorage.clearAll();
+              if (!mounted) return;
+              Navigator.pushReplacementNamed(context, '/login');
+            },
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Profil Saya',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        foregroundColor: Colors.white,
-        backgroundColor: _primaryColor,
-        centerTitle: true,
-        elevation: 4,
-        flexibleSpace: Container(
+  Widget _buildProfileHeader() {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-              gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF1976D2),
-              Color(0xFF42A5F5),
+            gradient: AppColors.primaryGradient,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
             ],
-          )),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // Profile Picture
+                Hero(
+                  tag: 'profile_picture',
+                  child: Container(
+                    width: 90,
+                    height: 90,
                     decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                       gradient: LinearGradient(
                         colors: [
-                          Color(0xFF1976D2).withOpacity(0.8),
-                          Color(0xFF42A5F5),
+                          AppColors.textLight.withOpacity(0.3),
+                          AppColors.textLight.withOpacity(0.1),
                         ],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      children: [
-                        const CircleAvatar(
-                          radius: 50,
-                          backgroundColor: Colors.white,
-                          child: Icon(
-                            Icons.person,
-                            size: 50,
-                            color: Colors.blue,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          _userProfile?['fullname'] ?? 'Nama Pengguna',
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _userProfile?['kelas'] ?? 'Kelas',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildProfileItem(
-                    Icons.badge,
-                    'NISN',
-                    _userProfile?['nisn'] ?? '-',
-                  ),
-                  _buildProfileItem(
-                    Icons.school,
-                    'Kelas',
-                    _userProfile?['kelas'] ?? '-',
-                  ),
-                  _buildProfileItem(
-                    Icons.email,
-                    'Email',
-                    _userProfile?['email'] ?? '-',
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton.icon(
-                      icon: const Icon(Icons.logout, size: 20),
-                      label: const Text(
-                        'Keluar',
-                        style: TextStyle(fontSize: 16),
+                      border: Border.all(
+                        color: AppColors.textLight.withOpacity(0.5),
+                        width: 3,
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red[400],
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      onPressed: () async {
-                        await SharedStorage.clearAll();
-                        if (!mounted) return;
-                        Navigator.pushReplacementNamed(context, '/login');
-                      },
+                    ),
+                    child: const Icon(
+                      CupertinoIcons.person_fill,
+                      size: 45,
+                      color: AppColors.textLight,
                     ),
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 20),
+                // Name
+                Text(
+                  _userProfile?['fullname'] ?? 'Nama Pengguna',
+                  style: AppTextStyles.headlineSmall.copyWith(
+                    color: AppColors.textLight,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                // Class/Role
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.textLight.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: AppColors.textLight.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    _userProfile?['kelas'] ?? 'Kelas',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: AppColors.textLight,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required int index,
+  }) {
+    return AnimatedBuilder(
+      animation: _animationController,
+      builder: (context, child) {
+        final itemAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+          CurvedAnimation(
+            parent: _animationController,
+            curve: Interval(
+              0.2 + (index * 0.1),
+              0.8 + (index * 0.1),
+              curve: Curves.easeOutCubic,
+            ),
+          ),
+        );
+
+        return FadeTransition(
+          opacity: itemAnimation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.3, 0),
+              end: Offset.zero,
+            ).animate(itemAnimation),
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: AppDecorations.cardDecoration,
+        child: CupertinoListTile(
+          padding: const EdgeInsets.all(16),
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: AppColors.primary,
+              size: 22,
+            ),
+          ),
+          title: Text(
+            label,
+            style: AppTextStyles.labelLarge,
+          ),
+          subtitle: Text(
+            value,
+            style: AppTextStyles.bodyLarge.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CupertinoPageScaffold(
+      backgroundColor: AppColors.background,
+      navigationBar: CupertinoNavigationBar(
+        middle: const Text(
+          'Profil Saya',
+          style: AppTextStyles.titleMedium,
+        ),
+        backgroundColor: AppColors.cardBackground,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.border,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: SafeArea(
+        child: _isLoading
+            ? const Center(
+                child: CupertinoActivityIndicator(radius: 20),
+              )
+            : SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 8),
+                    // Profile Header with Gradient
+                    _buildProfileHeader(),
+
+                    const SizedBox(height: 16),
+
+                    // Info Section Title
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Text(
+                        'Informasi Pribadi',
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Profile Information Items
+                    _buildProfileItem(
+                      icon: CupertinoIcons.person_circle,
+                      label: 'NISN',
+                      value: _userProfile?['nisn'] ?? '-',
+                      index: 0,
+                    ),
+                    _buildProfileItem(
+                      icon: CupertinoIcons.building_2_fill,
+                      label: 'Kelas',
+                      value: _userProfile?['kelas'] ?? '-',
+                      index: 1,
+                    ),
+                    _buildProfileItem(
+                      icon: CupertinoIcons.mail,
+                      label: 'Email',
+                      value: _userProfile?['email'] ?? '-',
+                      index: 2,
+                    ),
+
+                    const SizedBox(height: 32),
+
+                    // Logout Button
+                    AnimatedBuilder(
+                      animation: _animationController,
+                      builder: (context, child) {
+                        final logoutAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+                          CurvedAnimation(
+                            parent: _animationController,
+                            curve: const Interval(
+                              0.6,
+                              1.0,
+                              curve: Curves.easeOutCubic,
+                            ),
+                          ),
+                        );
+
+                        return FadeTransition(
+                          opacity: logoutAnimation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.3),
+                              end: Offset.zero,
+                            ).animate(logoutAnimation),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: CupertinoButton(
+                          color: AppColors.error,
+                          borderRadius: BorderRadius.circular(12),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          onPressed: _showLogoutDialog,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                CupertinoIcons.arrow_right_square,
+                                color: AppColors.textLight,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Keluar',
+                                style: AppTextStyles.buttonLarge,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 32),
+                  ],
+                ),
+              ),
+      ),
     );
   }
 }

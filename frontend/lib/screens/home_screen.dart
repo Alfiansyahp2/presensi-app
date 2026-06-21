@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_absensi/screens/profile_screen.dart';
 import 'package:flutter_absensi/screens/history_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_absensi/service/API_config.dart';
 import 'package:flutter_absensi/utils/shared_storage.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_absensi/theme/app_theme.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -20,10 +22,6 @@ class _HomeScreenState extends State<HomeScreen>
     with SingleTickerProviderStateMixin {
   LatLng? _currentPosition;
   bool _hasAbsenToday = false;
-  final Color _primaryColor = const Color(0xFF1976D2);
-  final Color _secondaryColor = const Color(0xFF42A5F5);
-  final Color _successColor = const Color(0xFF00C853);
-  final Color _errorColor = const Color(0xFFD32F2F);
 
   // Getter untuk menghitung isInRadius secara real-time
   bool get _isInRadius {
@@ -32,8 +30,9 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   late AnimationController _animationController;
-  late Animation<double> _fadeInAnimation;
-  late Animation<Offset> _slideUpAnimation;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _slideAnimation;
 
   final LatLng _targetLocation =
       const LatLng(-7.32787262808773, 112.79426795133186); // MA-2, Jl. Medokan Asri Tengah No.12 Blok Q, Medokan Ayu, Kec. Rungkut, Surabaya
@@ -43,18 +42,31 @@ class _HomeScreenState extends State<HomeScreen>
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 1200),
     );
-    _fadeInAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
-    );
-    _slideUpAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.5),
-      end: Offset.zero,
+
+    _scaleAnimation = Tween<double>(
+      begin: 0.8,
+      end: 1.0,
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOutBack,
+    ));
+
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    _slideAnimation = Tween<double>(
+      begin: 0.3,
+      end: 0.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOutCubic,
     ));
 
     // Cek apakah sudah absen hari ini
@@ -139,6 +151,35 @@ class _HomeScreenState extends State<HomeScreen>
     return distance <= radiusMeter;
   }
 
+  void _showIOSDialog({
+    required String title,
+    required String content,
+    String? actionText,
+    VoidCallback? onAction,
+  }) {
+    showCupertinoDialog(
+      context: context,
+      builder: (BuildContext context) => CupertinoAlertDialog(
+        title: Text(title),
+        content: Text(content),
+        actions: [
+          if (actionText != null && onAction != null)
+            CupertinoDialogAction(
+              child: Text(actionText),
+              onPressed: () {
+                Navigator.pop(context);
+                onAction();
+              },
+            ),
+          CupertinoDialogAction(
+            child: const Text('OK'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitAbsen() async {
     if (_currentPosition == null) return;
 
@@ -151,16 +192,9 @@ class _HomeScreenState extends State<HomeScreen>
 
     if (!_isInRadius) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('❌ Anda berada di luar radius absen'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _errorColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          duration: const Duration(seconds: 3),
-        ),
+      _showIOSDialog(
+        title: 'Di Luar Radius',
+        content: 'Anda berada di luar radius absen (50 meter). Silakan mendekat ke lokasi absen.',
       );
       return;
     }
@@ -195,119 +229,57 @@ class _HomeScreenState extends State<HomeScreen>
             _hasAbsenToday = true;
           });
 
-          // Tampilkan pesan sukses TANPA navigate
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'Absen Berhasil!',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          'Waktu: ${DateTime.now().toString().substring(0, 19)}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: _successColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              duration: const Duration(seconds: 4),
-              action: SnackBarAction(
-                label: 'LIHAT RIWAYAT',
-                textColor: Colors.white,
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const HistoryScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
+          // Tampilkan dialog sukses iOS-style
+          _showIOSDialog(
+            title: 'Absen Berhasil!',
+            content: 'Waktu: ${DateTime.now().toString().substring(0, 19)}',
+            actionText: 'Lihat Riwayat',
+            onAction: () {
+              Navigator.push(
+                context,
+                CupertinoPageRoute(
+                  builder: (context) => const HistoryScreen(),
+                ),
+              );
+            },
           );
         } else {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ ${responseData['message']}'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: _errorColor,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-              duration: const Duration(seconds: 3),
-            ),
+          _showIOSDialog(
+            title: 'Gagal',
+            content: responseData['message'] ?? 'Terjadi kesalahan',
           );
         }
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('❌ Gagal menghubungi server'),
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: _errorColor,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          duration: const Duration(seconds: 3),
-        ),
+      _showIOSDialog(
+        title: 'Error',
+        content: 'Gagal menghubungi server. Silakan cek koneksi internet Anda.',
       );
     }
   }
 
   Widget _buildMapCard() {
-
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        height: 320,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.white, Colors.grey[50]!],
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowColor,
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: _primaryColor.withOpacity(0.2),
-              blurRadius: 15,
-              spreadRadius: 2,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(20),
-          child: Stack(
-            children: [
-              FlutterMap(
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            SizedBox(
+              height: 320,
+              child: FlutterMap(
                 options: MapOptions(
                   initialCenter: _currentPosition!,
                   initialZoom: 17,
@@ -329,8 +301,8 @@ class _HomeScreenState extends State<HomeScreen>
                         width: 60,
                         height: 60,
                         child: Icon(
-                          Icons.location_on,
-                          color: _isInRadius ? Colors.green : Colors.red,
+                          CupertinoIcons.location_solid,
+                          color: _isInRadius ? AppColors.success : AppColors.error,
                           size: 48,
                         ),
                       ),
@@ -339,126 +311,138 @@ class _HomeScreenState extends State<HomeScreen>
                         width: 40,
                         height: 40,
                         child: Icon(
-                          Icons.school,
-                          color: _primaryColor,
+                          CupertinoIcons.location_solid,
+                          color: AppColors.primary,
                           size: 36,
                         ),
                       ),
                     ],
                   ),
-                  // CircleLayer REMOVED - tidak compatible dengan Flutter Web
-                  // Menggunakan badge dan text indicator sebagai pengganti
                 ],
               ),
-              Positioned(
-                top: 10,
-                left: 10,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 5,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    'Radius: 50m',
-                    style: TextStyle(
-                      color: _primaryColor,
-                      fontWeight: FontWeight.bold,
+            ),
+            // Radius Badge
+            Positioned(
+              top: 12,
+              left: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBackground,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.shadowMedium,
+                      blurRadius: 8,
+                      spreadRadius: 1,
                     ),
-                  ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      CupertinoIcons.scope,
+                      color: AppColors.primary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Radius: 50m',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _isInRadius
-                        ? _successColor.withOpacity(0.9)
-                        : _errorColor.withOpacity(0.9),
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        spreadRadius: 1,
+            ),
+            // Status Badge
+            Positioned(
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _isInRadius
+                      ? AppColors.success
+                      : AppColors.error,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isInRadius ? AppColors.success : AppColors.error).withOpacity(0.3),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isInRadius ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.xmark_circle_fill,
+                      color: AppColors.textLight,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _isInRadius ? 'Dalam Radius' : 'Di Luar Radius',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: AppColors.textLight,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        _isInRadius ? Icons.check_circle : Icons.cancel,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        _isInRadius ? 'Dalam Radius' : 'Di Luar Radius',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              Positioned(
-                bottom: 10,
-                left: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: _isInRadius
-                        ? _successColor.withOpacity(0.95)
-                        : _errorColor.withOpacity(0.95),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 8,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _isInRadius ? Icons.check_circle : Icons.cancel,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
+            ),
+            // Status Bar at Bottom
+            Positioned(
+              bottom: 12,
+              left: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isInRadius
+                      ? AppColors.success
+                      : AppColors.error,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: (_isInRadius ? AppColors.success : AppColors.error).withOpacity(0.3),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      _isInRadius ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.xmark_circle_fill,
+                      color: AppColors.textLight,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
                         _isInRadius
                             ? 'Anda berada dalam radius absen (50m)'
                             : 'Anda di luar radius absen - Jarak lebih dari 50m',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
+                        style: AppTextStyles.bodyMedium.copyWith(
+                          color: AppColors.textLight,
+                          fontWeight: FontWeight.w600,
                         ),
+                        textAlign: TextAlign.center,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -480,50 +464,42 @@ class _HomeScreenState extends State<HomeScreen>
           )
         : 0.0;
 
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
         borderRadius: BorderRadius.circular(16),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Colors.white, Colors.grey[50]!],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            ),
-          ],
-          border: Border.all(
-            color: _isInRadius ? _successColor : _errorColor,
-            width: 2,
-          ),
+        border: Border.all(
+          color: _isInRadius ? AppColors.success : AppColors.error,
+          width: 2,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowColor,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Status Header
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: _isInRadius
-                        ? _successColor.withOpacity(0.1)
-                        : _errorColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
+                        ? AppColors.success.withOpacity(0.1)
+                        : AppColors.error.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
-                    _isInRadius ? Icons.check_circle : Icons.info,
-                    color: _isInRadius ? _successColor : _errorColor,
+                    _isInRadius ? CupertinoIcons.checkmark_circle_fill : CupertinoIcons.info_circle_fill,
+                    color: _isInRadius ? AppColors.success : AppColors.error,
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -533,25 +509,15 @@ class _HomeScreenState extends State<HomeScreen>
                     children: [
                       Text(
                         _isInRadius ? 'ANDA DALAM RADIUS' : 'DI LUAR RADIUS',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _isInRadius ? _successColor : _errorColor,
+                        style: AppTextStyles.titleSmall.copyWith(
+                          color: _isInRadius ? AppColors.success : AppColors.error,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         'Jarak: ${distance.toStringAsFixed(1)} meter dari lokasi',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      Text(
-                        '$todayName, $todayDate',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: _primaryColor,
-                          fontWeight: FontWeight.w500,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -560,36 +526,75 @@ class _HomeScreenState extends State<HomeScreen>
               ],
             ),
             const SizedBox(height: 12),
-            Divider(color: Colors.grey[300]),
-            const SizedBox(height: 8),
+            // Date Info
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.primaryBackground,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    CupertinoIcons.calendar,
+                    color: AppColors.primary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$todayName, $todayDate',
+                    style: AppTextStyles.labelMedium.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Divider
+            Container(
+              height: 1,
+              color: AppColors.border,
+            ),
+            const SizedBox(height: 12),
+            // Current Location
             Row(
               children: [
-                const Icon(Icons.my_location, color: Colors.blue, size: 20),
-                const SizedBox(width: 8),
+                Icon(
+                  CupertinoIcons.location,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     _currentPosition != null
                         ? 'Lat: ${_currentPosition!.latitude.toStringAsFixed(6)}, Lng: ${_currentPosition!.longitude.toStringAsFixed(6)}'
                         : 'Lokasi tidak terdeteksi',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
+            // Target Location
             Row(
               children: [
-                Icon(Icons.school, color: _primaryColor, size: 20),
-                const SizedBox(width: 8),
-                const Expanded(
+                Icon(
+                  CupertinoIcons.location_solid,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Text(
                     'MA-2, Jl. Medokan Asri Tengah No.12 Blok Q, Medokan Ayu, Rungkut, Surabaya',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey,
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -607,34 +612,31 @@ class _HomeScreenState extends State<HomeScreen>
 
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
+      child: CupertinoButton(
         onPressed: isButtonDisabled ? null : _submitAbsen,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isInRadius && !_hasAbsenToday ? _primaryColor : Colors.grey,
-          disabledBackgroundColor: Colors.grey,
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          elevation: _isInRadius && !_hasAbsenToday ? 5 : 0,
-          shadowColor: _isInRadius && !_hasAbsenToday ? _primaryColor.withOpacity(0.3) : null,
-        ),
+        color: isButtonDisabled
+            ? AppColors.textTertiary
+            : AppColors.primary,
+        disabledColor: AppColors.textTertiary,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        borderRadius: BorderRadius.circular(14),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              _hasAbsenToday ? Icons.check_circle : (_isInRadius ? Icons.fingerprint : Icons.location_off),
-              color: Colors.white,
+              _hasAbsenToday
+                  ? CupertinoIcons.check_mark_circled
+                  : (_isInRadius ? CupertinoIcons.check_mark_circled : CupertinoIcons.location),
+              color: AppColors.textLight,
+              size: 24,
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 12),
             Text(
               _hasAbsenToday
                   ? 'SUDAH ABSEN HARI INI'
                   : (_isInRadius ? 'ABSEN SEKARANG' : 'DI LUAR RADIUS - TIDAK BISA ABSEN'),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+              style: AppTextStyles.buttonLarge.copyWith(
+                color: AppColors.textLight,
               ),
             ),
           ],
@@ -643,97 +645,110 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Widget _buildLoadingScreen() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: CupertinoActivityIndicator(
+              color: AppColors.primary,
+              radius: 20,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Mendeteksi lokasi...',
+            style: AppTextStyles.bodyLarge.copyWith(
+              color: AppColors.primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text(
+    return CupertinoPageScaffold(
+      backgroundColor: AppColors.background,
+      navigationBar: CupertinoNavigationBar(
+        middle: Text(
           'Beranda Absensi',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+          style: AppTextStyles.titleMedium.copyWith(
+            color: AppColors.textLight,
           ),
         ),
-        foregroundColor: Colors.white,
-        backgroundColor: _primaryColor,
-        centerTitle: true,
-        elevation: 6,
-        leading: IconButton(
-          icon: const Icon(Icons.access_time, size: 28),
+        backgroundColor: AppColors.primary,
+        border: null,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: Icon(
+            CupertinoIcons.time,
+            color: AppColors.textLight,
+            size: 28,
+          ),
           onPressed: () {
             Navigator.push(
               context,
-              MaterialPageRoute(
+              CupertinoPageRoute(
                 builder: (context) => const HistoryScreen(),
               ),
             );
           },
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person, size: 28),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfileScreen(),
-                  fullscreenDialog: true,
-                ),
-              );
-            },
+        trailing: CupertinoButton(
+          padding: EdgeInsets.zero,
+          child: Icon(
+            CupertinoIcons.person_circle,
+            color: AppColors.textLight,
+            size: 28,
           ),
-        ],
-        flexibleSpace: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [_primaryColor, _secondaryColor],
-            ),
-          ),
+          onPressed: () {
+            Navigator.push(
+              context,
+              CupertinoPageRoute(
+                builder: (context) => const ProfileScreen(),
+                fullscreenDialog: true,
+              ),
+            );
+          },
         ),
       ),
-      body: _currentPosition == null
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(_primaryColor),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Mendeteksi lokasi...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: _primaryColor,
+      child: SafeArea(
+        child: _currentPosition == null
+            ? _buildLoadingScreen()
+            : FadeTransition(
+                opacity: _fadeAnimation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(0, _slideAnimation.value),
+                    end: Offset.zero,
+                  ).animate(_animationController),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Map Card with Scale Animation
+                        ScaleTransition(
+                          scale: _scaleAnimation,
+                          child: _buildMapCard(),
+                        ),
+                        const SizedBox(height: 20),
+                        // Location Info
+                        _buildLocationInfo(),
+                        const SizedBox(height: 20),
+                        // Absen Button
+                        _buildAbsenButton(),
+                      ],
                     ),
-                  ),
-                ],
-              ),
-            )
-          : FadeTransition(
-              opacity: _fadeInAnimation,
-              child: SlideTransition(
-                position: _slideUpAnimation,
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(vertical: 20, horizontal: 20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      _buildMapCard(),
-                      const SizedBox(height: 20),
-                      _buildLocationInfo(),
-                      const SizedBox(height: 20),
-                      _buildAbsenButton(),
-                    ],
                   ),
                 ),
               ),
             ),
-    );
+          );
   }
 }
