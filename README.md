@@ -1,204 +1,90 @@
 # 🎓 Presensi App - Sistem Absensi Siswa
 
-Sistem absensi siswa berbasis **GPS dengan Geofencing** untuk MA-2 Medokan Asri Tengah, Surabaya.
+Sistem absensi siswa berbasis **GPS dengan Geofencing** untuk validasi kehadiran berdasarkan lokasi.
+
+[![Flutter](https://img.shields.io/badge/Flutter-3.6.1-blue)](https://flutter.dev)
+[![Laravel](https://img.shields.io/badge/Laravel-10-red)](https://laravel.com)
+[![License](https://img.shields.io/badge/License-Education-green)](LICENSE)
 
 ## 📋 Overview
 
-**Presensi App** adalah sistem absensi yang memvalidasi kehadiran siswa berdasarkan lokasi GPS. Siswa hanya bisa melakukan absensi jika berada dalam radius **50 meter** dari lokasi sekolah menggunakan formula **Haversine** untuk perhitungan jarak.
+**Presensi App** adalah sistem absensi yang memvalidasi kehadiran siswa berdasarkan lokasi GPS. Siswa hanya bisa melakukan absensi jika berada dalam radius **50 meter** dari lokasi sekolah menggunakan formula **Haversine** untuk perhitungan jarak yang akurat.
+
+### ✨ Key Features
+
+- 📍 **GPS-based Attendance** - Validasi lokasi real-time dengan geofencing
+- 🗺️ **Interactive Maps** - Peta interaktif dengan OpenStreetMap
+- 🌓 **Dark Mode** - Theme gelap/terang dengan persistent storage
+- 🎨 **Formal Design** - UI professional dan modern
+- 🔐 **Secure Authentication** - Token-based auth dengan Laravel Sanctum
+- 📜 **Attendance History** - Riwayat absensi lengkap
 
 ## 🏗️ Architecture
 
-Monorepo yang terdiri dari:
+Monorepo structure:
 
 ```
 presensi-app/
 ├── backend/         <- Laravel 10 API
 ├── frontend/        <- Flutter Mobile App
-├── docs/           <- Documentation
-└── scripts/        <- Helper Scripts
+└── DOCUMENTATION.md <- Complete documentation
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
-- **Laravel:** PHP 8.1+, Composer, MySQL
-- **Flutter:** Flutter SDK 3.6.1+, Dart
-- **Tools:** Git, Android Studio / VS Code
+- **Backend**: PHP 8.1+, Composer, MySQL
+- **Frontend**: Flutter SDK 3.6.1+, Android Studio / VS Code
+- **Tools**: Git, Postman (optional)
 
-### 1. Clone Repository
+### Installation
 
 ```bash
-git clone <repository-url>
+# 1. Clone repository
+git clone https://github.com/Alfiansyahp2/presensi-app.git
 cd presensi-app
-```
 
-### 2. Backend Setup (Laravel)
-
-```bash
+# 2. Backend Setup
 cd backend
-
-# Install dependencies
 composer install
-
-# Setup environment
 cp .env.example .env
 php artisan key:generate
-
-# Configure database di .env
-# DB_DATABASE=presensis
-# DB_USERNAME=root
-# DB_PASSWORD=
-
-# Run migration & seeder
 php artisan migrate:fresh --seed
-
-# Start server
 php artisan serve
-# Access: http://localhost:8000
-```
 
-### 3. Frontend Setup (Flutter)
-
-```bash
+# 3. Frontend Setup
 cd frontend
-
-# Get dependencies
 flutter pub get
-
-# Run app (connected device/emulator)
 flutter run
-
-# Atau build APK
-flutter build apk
 ```
 
-## 📱 Features
+📖 **For detailed setup instructions, see [DOCUMENTATION.md](DOCUMENTATION.md)**
 
-### Backend (Laravel API)
-- ✅ RESTful API dengan Laravel Sanctum
-- ✅ User authentication (Register, Login, Logout)
-- ✅ GPS-based attendance validation
-- ✅ Geofencing radius 50 meter
-- ✅ Attendance history
-- ✅ Student profile management
+## 📱 Screenshots
 
-### Frontend (Flutter Mobile)
-- ✅ User registration & login
-- ✅ Real-time GPS location tracking
-- ✅ Interactive map (OpenStreetMap)
-- ✅ Attendance submission
-- ✅ Attendance history
-- ✅ Profile management
-- ✅ Persistent login (token storage)
+| Home Screen | History Screen | Profile Screen |
+|-------------|----------------|----------------|
+| 🗺️ Interactive GPS Map | 📜 Attendance History | 👤 User Profile |
+| Real-time location tracking | Complete attendance records | Profile management |
+| Radius validation (50m) | Status indicators | Dark mode support |
 
-## 📚 Documentation
-
-| Document | Description |
-|----------|-------------|
-| [API Documentation](docs/API.md) | API endpoints, request/response format |
-| [Migration Guide](docs/MIGRATION_GUIDE.md) | Database migration & seeder guide |
-| [Code Review Summary](docs/CODE_REVIEW_SUMMARY.md) | Models & Controllers analysis |
-| [Deployment Guide](docs/DEPLOYMENT.md) | Production deployment guide |
-
-## 🔧 Configuration
-
-### Backend Configuration
-
-**File:** `backend/.env`
-
-```env
-APP_NAME="Presensi App"
-APP_ENV=local
-APP_KEY=base64:...
-APP_DEBUG=true
-APP_URL=http://localhost:8000
-
-DB_CONNECTION=mysql
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=presensis
-DB_USERNAME=root
-DB_PASSWORD=
-
-# School Location (MA-2, Surabaya)
-SCHOOL_LAT=-7.32787262808773
-SCHOOL_LNG=112.79426795133186
-SCHOOL_RADIUS=0.05
-```
-
-### Frontend Configuration
-
-**File:** `frontend/lib/service/API_config.dart`
-
-```dart
-static const String _baseUrl = 'http://localhost:8000/api';
-```
-
-## 🗄️ Database Structure
-
-### Tables
-
-**users**
-- `id`, `fullname`, `nisn` (unique), `kelas`, `email` (unique), `password`
-- Timestamps: `created_at`, `updated_at`
-
-**absens**
-- `id`, `user_id` (FK), `status` (enum: hadir/izin/sakit)
-- `latitude` (decimal 10,7), `longitude` (decimal 10,7)
-- `waktu_absen` (timestamp)
-- Timestamps: `created_at`, `updated_at`
-
-## 🌐 API Endpoints
-
-### Authentication
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| POST | `/api/register` | Register new student | Public |
-| POST | `/api/login` | Login & get token | Public |
-| POST | `/api/logout` | Logout user | Sanctum |
-| GET | `/api/profile` | Get user profile | Sanctum |
-
-### Attendance
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| POST | `/api/absen` | Submit attendance | Sanctum |
-| GET | `/api/history` | Get attendance history | Sanctum |
-
-## 🧪 Testing
-
-### Backend Tests
-
-```bash
-cd backend
-php artisan test
-```
-
-### Frontend Tests
-
-```bash
-cd frontend
-flutter test
-```
-
-## 📦 Tech Stack
+## 🛠️ Tech Stack
 
 ### Backend
-- **Framework:** Laravel 10
-- **Language:** PHP 8.1+
-- **Database:** MySQL 8.0
-- **Authentication:** Laravel Sanctum
-- **API:** RESTful
+- **Framework**: Laravel 10
+- **Language**: PHP 8.1+
+- **Database**: MySQL 8.0
+- **Authentication**: Laravel Sanctum
+- **API**: RESTful
 
 ### Frontend
-- **Framework:** Flutter 3.6.1
-- **Language:** Dart
-- **Maps:** Flutter Map (OpenStreetMap)
-- **Location:** Geolocator
-- **Storage:** Shared Preferences
-- **HTTP:** http package
+- **Framework**: Flutter 3.6.1
+- **Language**: Dart
+- **Maps**: Flutter Map (OpenStreetMap)
+- **Location**: Geolocator
+- **Storage**: Shared Preferences
+- **State Management**: setState + SharedStorage
 
 ## 🔒 Security
 
@@ -207,102 +93,94 @@ flutter test
 - ✅ Input validation
 - ✅ SQL injection protection (Eloquent ORM)
 - ✅ CORS configuration
-- ⚠️ Rate limiting (recommended to add)
-- ⚠️ HTTPS enforcement (production)
+- ✅ API keys in `.gitignore` (local.properties)
 
-## 🚢 Deployment
+🔐 **Security guidelines in [DOCUMENTATION.md](DOCUMENTATION.md#security-guidelines)**
 
-### Backend Deployment
+## 📚 Documentation
 
-See [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
+Complete documentation available in [DOCUMENTATION.md](DOCUMENTATION.md):
 
-### Frontend Deployment
+- ⚙️ [Setup & Configuration](DOCUMENTATION.md#setup--configuration)
+- 🔒 [Security Guidelines](DOCUMENTATION.md#security-guidelines)
+- 🌐 [API Endpoints](DOCUMENTATION.md#api-endpoints)
+- 🗄️ [Database Structure](DOCUMENTATION.md#database-structure)
+- 👨‍💻 [Development Guidelines](DOCUMENTATION.md#development-guidelines)
+- 🚢 [Deployment Guide](DOCUMENTATION.md#deployment)
+- 🐛 [Troubleshooting](DOCUMENTATION.md#troubleshooting)
+
+## 🌐 API Endpoints
+
+### Authentication
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/register` | Register new student |
+| POST | `/api/login` | Login & get token |
+| POST | `/api/logout` | Logout user |
+| GET | `/api/profile` | Get user profile |
+
+### Attendance
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/absen` | Submit attendance |
+| GET | `/api/history` | Get attendance history |
+
+📖 **Full API documentation in [DOCUMENTATION.md](DOCUMENTATION.md#api-endpoints)**
+
+## 🧪 Testing
 
 ```bash
-cd frontend
+# Backend Tests
+cd backend
+php artisan test
 
-# Build APK untuk Android
+# Frontend Tests
+cd frontend
+flutter test
+```
+
+## 📦 Build & Release
+
+```bash
+# Build APK
 flutter build apk --release
 
-# Build IPA untuk iOS
-flutter build ios --release
+# Build App Bundle (Google Play)
+flutter build appbundle --release
 ```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'feat: Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
+
+📖 **See [Development Guidelines](DOCUMENTATION.md#development-guidelines)**
 
 ## 📝 Development Guidelines
 
-### Commit Convention
-
-```
-type(scope): subject
-
-[optional body]
-
-[optional footer]
-```
-
-**Types:**
-- `feat` - New feature
-- `fix` - Bug fix
-- `docs` - Documentation change
-- `style` - Code style change
-- `refactor` - Code refactoring
-- `test` - Adding tests
-- `chore` - Maintenance
-
-**Example:**
-```
-feat(backend): add daily attendance check
-
-Prevent users from submitting attendance multiple times per day.
-
-Closes #123
-```
-
-### Git Workflow
-
-```bash
-# Development branch
-git checkout -b feature/your-feature-name
-
-# Make changes & commit
-git add .
-git commit -m "feat: description"
-
-# Push & create PR
-git push origin feature/your-feature-name
-```
+- Follow [commit convention](DOCUMENTATION.md#commit-convention)
+- Write clear commit messages
+- Add tests for new features
+- Update documentation
 
 ## 🐛 Troubleshooting
 
-### Common Issues
+**Common Issues:**
 
-**1. Laravel Server Not Starting**
-```bash
-# Clear cache
-php artisan cache:clear
-php artisan config:clear
-php artisan route:clear
+- ❌ **GPS Permission Denied** → Check permissions in AndroidManifest.xml/Info.plist
+- ❌ **API Connection Refused** → Ensure Laravel server running on port 8000
+- ❌ **Maps Not Showing** → Verify Google Maps API key in local.properties
 
-# Check port conflicts
-# Use different port: php artisan serve --port=8001
-```
-
-**2. Flutter GPS Permission Denied**
-- Add location permissions in:
-  - `android/app/src/main/AndroidManifest.xml`
-  - `ios/Runner/Info.plist`
-
-**3. API Connection Refused**
-- Ensure Laravel server is running
-- Check API URL in `API_config.dart`
-- Verify network permissions
+📖 **Full troubleshooting guide in [DOCUMENTATION.md](DOCUMENTATION.md#troubleshooting)**
 
 ## 📞 Support
 
 For issues, questions, or contributions:
+- 🐛 [GitHub Issues](https://github.com/Alfiansyahp2/presensi-app/issues)
 - 📧 Email: support@presensi-app.com
-- 📱 WhatsApp: +62 xxx xxxx xxxx
-- 🐛 Issues: [GitHub Issues](<repository-url>/issues)
 
 ## 📜 License
 
@@ -310,12 +188,14 @@ This project is for educational purposes (Ujikom).
 
 ## 👥 Credits
 
-- **Backend Developer:** [Your Name]
-- **Frontend Developer:** [Your Name]
-- **Institution:** MA-2 Medokan Asri Tengah, Surabaya
+- **Backend Developer**: Alfiansyah
+- **Frontend Developer**: Alfiansyah
+- **Institution**: MA-2 Medokan Asri Tengah, Surabaya
 
 ---
 
-**Version:** 1.0.0
-**Last Updated:** 2026-06-21
-**Status:** ✅ Production Ready
+**Version**: 1.0.0
+**Last Updated**: 2026-06-21
+**Status**: ✅ Production Ready
+
+⭐ **Star this repo if it helped you!**

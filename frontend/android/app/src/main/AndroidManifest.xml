@@ -10,7 +10,7 @@
         <!-- Optional: kalau pakai Google Maps -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyBCABn2os7bOxALu4Rf0k5I4WpcwiRYnGU" />
+            android:value="${MAPS_API_KEY}" />
 
         <!-- Diperlukan oleh Flutter -->
         <meta-data

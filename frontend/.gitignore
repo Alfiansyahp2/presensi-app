@@ -48,3 +48,8 @@ app.*.map.json
 .env
 .env.production
 .env.staging
+
+# API Keys and Secrets - NEVER commit these!
+# Keep local.properties secure (contains API keys)
+/android/local.properties
+android/local.properties

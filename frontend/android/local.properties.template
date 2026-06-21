@@ -1,0 +1,43 @@
+# Android SDK Configuration
+# IMPORTANT: Copy this file to local.properties and fill in your values
+# NEVER commit local.properties to git (it's in .gitignore)
+
+# Android SDK Path (auto-configured by Android Studio/Flutter)
+sdk.dir=/path/to/your/android/sdk
+
+# Flutter SDK Path (auto-configured by Flutter)
+flutter.sdk=/path/to/your/flutter/sdk
+
+# Build Configuration
+flutter.buildMode=debug
+flutter.versionName=1.0.0
+flutter.versionCode=1
+
+# =============================================
+# API KEYS - KEEP THESE SECRET!
+# =============================================
+
+# Google Maps API Key
+# Required for: Interactive maps in home screen
+# Get your API key at: https://developers.google.com/maps/documentation/android-sdk/get-api-key
+#
+# Steps to create API key:
+# 1. Go to Google Cloud Console (https://console.cloud.google.com/)
+# 2. Create a new project or select existing one
+# 3. Enable "Maps SDK for Android"
+# 4. Create API key with restrictions:
+#    - Application restrictions: Android app
+#    - Package name: com.example.flutter_absensi (or your app's package name)
+#    - SHA-1 fingerprint: Get from your signing certificate
+# 5. Copy the API key and replace 'YOUR_GOOGLE_MAPS_API_KEY' below
+
+MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY_HERE
+
+# =============================================
+# INSTRUCTIONS:
+# =============================================
+#
+# 1. Copy this file: cp local.properties.template local.properties
+# 2. Replace YOUR_GOOGLE_MAPS_API_KEY_HERE with your actual Google Maps API key
+# 3. NEVER commit local.properties to git
+# 4. If you accidentally commit it, rotate your API key immediately

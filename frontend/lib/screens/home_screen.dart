@@ -49,10 +49,13 @@ class _HomeScreenState extends State<HomeScreen>
   late Animation<double> _scaleAnimation;
   late Animation<double> _slideAnimation;
 
+  // School location for attendance validation
+  // TODO: Configure this with your school's location
+  // Get coordinates from: https://www.google.com/maps
   final LatLng _targetLocation = const LatLng(
-    -7.32787262808773,
-    112.79426795133186,
-  ); // MA-2, Jl. Medokan Asri Tengah No.12 Blok Q, Medokan Ayu, Kec. Rungkut, Surabaya
+    -7.32787262808773,  // TODO: Replace with your school's latitude
+    112.79426795133186,  // TODO: Replace with your school's longitude
+  ); // Your school name and address
 
   @override
   void initState() {
@@ -691,7 +694,7 @@ class _HomeScreenState extends State<HomeScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'MA-2, Jl. Medokan Asri Tengah No.12 Blok Q',
+                  'School Location - Configure in home_screen.dart',
                   style: TextStyle(
                     color: _isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
                     fontSize: 14,
