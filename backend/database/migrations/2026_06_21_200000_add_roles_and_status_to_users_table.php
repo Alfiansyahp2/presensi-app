@@ -3,6 +3,7 @@
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
@@ -11,22 +12,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('users', function (Blueprint $table) {
-            // Add role column with enum
-            $table->enum('role', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT'])
-                ->default('STUDENT')
-                ->after('email');
+        // Step 1: Modify existing role column enum (using raw SQL)
+        DB::statement("ALTER TABLE users MODIFY COLUMN role ENUM('SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT') DEFAULT 'STUDENT'");
 
-            // Add status column for account management
+        // Step 2: Add status column for account management
+        Schema::table('users', function (Blueprint $table) {
             $table->enum('status', ['PENDING', 'ACTIVE', 'SUSPENDED'])
                 ->default('PENDING')
                 ->after('role');
-
-            // Make school_id NOT NULL for proper tenant isolation
-            // Existing NULL records will need to be handled in data migration
-            $table->unsignedBigInteger('school_id')
-                ->nullable()
-                ->change();
 
             // Add indexes for performance
             $table->index('role');
@@ -51,7 +44,8 @@ return new class extends Migration
             $table->id();
 
             $table->enum('role', ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'TEACHER', 'STUDENT']);
-            $table->foreign('role')->references('role')->on('users')->onDelete('cascade');
+            // Note: No foreign key to users.role because it's an enum and causes circular dependency
+            // The enum values are validated at application level in User model
 
             $table->unsignedBigInteger('permission_id');
             $table->foreign('permission_id')->references('id')->on('permissions')->onDelete('cascade');
