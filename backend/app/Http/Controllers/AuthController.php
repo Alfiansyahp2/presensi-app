@@ -178,6 +178,24 @@ class AuthController extends Controller
         // Create new token
         $token = $user->createToken('auth_token')->plainTextToken;
 
+        // Prepare school data (only if user has a school)
+        $schoolData = null;
+        if ($user->school_id && $user->school) {
+            $schoolData = [
+                'id' => $user->school->id,
+                'nama_sekolah' => $user->school->nama_sekolah,
+                'kode_sekolah' => $user->school->kode_sekolah,
+                'alamat' => $user->school->alamat,
+                'latitude' => $user->school->latitude,
+                'longitude' => $user->school->longitude,
+                'radius_presensi' => $user->school->radius_presensi,
+                'jam_masuk' => $user->school->jam_masuk,
+                'jam_pulang' => $user->school->jam_pulang,
+                'toleransi_terlambat' => $user->school->toleransi_terlambat,
+                'status_aktif' => $user->school->status_aktif,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Login successful',
@@ -187,9 +205,13 @@ class AuthController extends Controller
                     'id' => $user->id,
                     'fullname' => $user->fullname,
                     'email' => $user->email,
+                    'nisn' => $user->nisn,
+                    'kelas' => $user->kelas,
                     'role' => $user->role,
                     'status' => $user->status,
                     'school_id' => $user->school_id,
+                    'school' => $schoolData,
+                    'permissions' => $user->permissions(),
                 ],
             ],
         ], 200);
@@ -205,6 +227,24 @@ class AuthController extends Controller
     {
         $user = $request->user();
 
+        // Prepare school data (only if user has a school)
+        $schoolData = null;
+        if ($user->school_id && $user->school) {
+            $schoolData = [
+                'id' => $user->school->id,
+                'nama_sekolah' => $user->school->nama_sekolah,
+                'kode_sekolah' => $user->school->kode_sekolah,
+                'alamat' => $user->school->alamat,
+                'latitude' => (float) $user->school->latitude,
+                'longitude' => (float) $user->school->longitude,
+                'radius_presensi' => $user->school->radius_presensi,
+                'jam_masuk' => $user->school->jam_masuk,
+                'jam_pulang' => $user->school->jam_pulang,
+                'toleransi_terlambat' => $user->school->toleransi_terlambat,
+                'status_aktif' => $user->school->status_aktif,
+            ];
+        }
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -216,12 +256,7 @@ class AuthController extends Controller
                 'role' => $user->role,
                 'status' => $user->status,
                 'school_id' => $user->school_id,
-                'school' => $user->school ? [
-                    'id' => $user->school->id,
-                    'nama_sekolah' => $user->school->nama_sekolah,
-                    'alamat' => $user->school->alamat,
-                    'status_aktif' => $user->school->status_aktif,
-                ] : null,
+                'school' => $schoolData,
                 'permissions' => $user->permissions(),
                 'created_at' => $user->created_at,
             ],

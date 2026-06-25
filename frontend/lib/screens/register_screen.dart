@@ -4,6 +4,8 @@ import '../core/widgets/animated_background.dart';
 import '../core/widgets/interactive_input_field.dart';
 import '../core/widgets/premium_button.dart';
 import '../core/theme/app_colors.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/common/theme_toggle_button.dart';
 import 'login_screen.dart';
 
 /// 🎨 Formal Register Screen untuk Sekolah dengan Theme Support
@@ -27,8 +29,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen>
     with TickerProviderStateMixin {
-  // Theme mode
-  bool _isDarkMode = false;
+  final ThemeProvider _themeProvider = ThemeProvider();
 
   // Fade & slide animations
   late AnimationController _fadeController;
@@ -71,16 +72,10 @@ class _RegisterScreenState extends State<RegisterScreen>
     super.dispose();
   }
 
-  void _toggleTheme() {
-    setState(() {
-      _isDarkMode = !_isDarkMode;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return AnimatedBackground(
-      isDarkMode: _isDarkMode,
+      isDarkMode: _themeProvider.isDarkMode,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
@@ -98,7 +93,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                         end: Offset.zero,
                       ).animate(_fadeController),
                       child: RegisterForm(
-                        isDarkMode: _isDarkMode,
+                        isDarkMode: _themeProvider.isDarkMode,
                       ),
                     ),
                   ),
@@ -109,38 +104,11 @@ class _RegisterScreenState extends State<RegisterScreen>
               Positioned(
                 top: 16,
                 right: 16,
-                child: _buildThemeToggle(),
+                child: const ThemeToggleButton(),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildThemeToggle() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _isDarkMode
-            ? AppColors.darkSurface.withValues(alpha: 0.8)
-            : Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(
-          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-          color: _isDarkMode
-              ? AppColors.darkTextPrimary
-              : AppColors.formalNavy,
-        ),
-        onPressed: _toggleTheme,
-        tooltip: _isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       ),
     );
   }

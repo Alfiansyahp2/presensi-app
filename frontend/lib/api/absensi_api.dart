@@ -242,4 +242,54 @@ class AbsensiApi {
       };
     }
   }
+
+  /// 🆕 GET ADMIN ATTENDANCE - Untuk Teacher/School Admin Dashboard
+  /// GET /api/absensi/admin
+  ///
+  /// Mengambil semua data absensi dengan filter (untuk dashboard teacher)
+  static Future<Map<String, dynamic>> getAdminAttendance({
+    required String token,
+    String? date,
+    String? status,
+  }) async {
+    try {
+      // Build query parameters
+      final queryParams = {
+        if (date != null) 'date': date,
+        if (status != null) 'status': status,
+      };
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/absensi/admin')
+          .replace(queryParameters: queryParams);
+
+      final response = await http.get(
+        uri,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      final responseData = json.decode(utf8.decode(response.bodyBytes));
+
+      if (response.statusCode == 200) {
+        return {
+          'success': true,
+          'data': responseData['data'],
+        };
+      } else {
+        return {
+          'success': false,
+          'message': responseData['message'] ?? 'Gagal mengambil data absensi',
+        };
+      }
+    } catch (e) {
+      debugPrint('Error fetching admin attendance: $e');
+      return {
+        'success': false,
+        'message': 'Terjadi kesalahan. Silakan coba lagi.',
+      };
+    }
+  }
 }

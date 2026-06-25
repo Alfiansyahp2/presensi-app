@@ -29,7 +29,7 @@ class ReportController extends Controller
             'role' => 'sometimes|in:STUDENT,TEACHER',
         ]);
 
-        $query = Absensi::with(['user:id,fullname,kelas,role', 'school:id,nama_sekolah']);
+        $query = Absensi::with(['user:id,name,role', 'school:id,nama_sekolah']);
 
         // SUPER_ADMIN can filter by school
         if ($user->isSuperAdmin() && isset($validated['school_id'])) {
@@ -105,7 +105,7 @@ class ReportController extends Controller
         $format = $validated['format'] ?? 'csv';
 
         // Get attendance data (same logic as attendanceReport)
-        $query = Absensi::with(['user:id,fullname,kelas,role', 'school:id,nama_sekolah']);
+        $query = Absensi::with(['user:id,name,role', 'school:id,nama_sekolah']);
 
         // SUPER_ADMIN can filter by school
         if ($user->isSuperAdmin() && isset($validated['school_id'])) {
@@ -155,7 +155,7 @@ class ReportController extends Controller
             foreach ($attendances as $attendance) {
                 fputcsv($file, [
                     $attendance->created_at->format('Y-m-d'),
-                    $attendance->user->fullname,
+                    $attendance->user->name,
                     $attendance->user->kelas,
                     $attendance->school->nama_sekolah,
                     $attendance->jam_masuk,
@@ -260,7 +260,7 @@ class ReportController extends Controller
         if ($user->isStudent()) {
             $statistics['personal'] = [
                 'user_id' => $user->id,
-                'fullname' => $user->fullname,
+                'name' => $user->name,
                 'kelas' => $user->kelas,
             ];
         }

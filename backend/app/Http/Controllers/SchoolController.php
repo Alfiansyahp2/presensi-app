@@ -135,7 +135,7 @@ class SchoolController extends Controller
         // SCHOOL_ADMIN gets their school data with users
         elseif ($user->isSchoolAdmin() && $user->school_id === $school->id) {
             $school->load(['users' => function ($query) {
-                $query->select('id', 'school_id', 'fullname', 'email', 'role', 'status');
+                $query->select('id', 'school_id', 'name', 'email', 'role', 'status');
             }]);
         }
         // TEACHER gets limited school info
@@ -443,7 +443,7 @@ class SchoolController extends Controller
             $query->where('status', $validated['status']);
         }
 
-        $attendances = $query->with('user:id,fullname,kelas,school_id')->get();
+        $attendances = $query->with('user:id,name,school_id')->get();
 
         return response()->json([
             'success' => true,

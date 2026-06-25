@@ -284,7 +284,7 @@ class AbsensiController extends Controller
             'status' => 'sometimes|in:HADIR,TERLAMBAT,IZIN,SAKIT',
         ]);
 
-        $query = Absensi::with(['user:id,fullname,kelas,role,school_id', 'school:id,nama_sekolah']);
+        $query = Absensi::with(['user:id,name,role,school_id', 'school:id,nama_sekolah']);
 
         // SUPER_ADMIN can filter by school
         if ($user->isSuperAdmin() && isset($validated['school_id'])) {

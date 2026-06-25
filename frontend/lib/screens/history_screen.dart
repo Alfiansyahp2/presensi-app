@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../utils/shared_storage.dart';
 import '../core/widgets/animated_background.dart';
 import '../core/theme/app_colors.dart';
+import '../providers/theme_provider.dart';
+import '../widgets/common/theme_toggle_button.dart';
 import 'login_screen.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -26,9 +28,9 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen>
     with TickerProviderStateMixin {
+  final ThemeProvider _themeProvider = ThemeProvider();
   List<dynamic> _attendanceHistory = [];
   bool _isLoading = true;
-  bool _isDarkMode = false;
 
   // Fade & slide animations
   late AnimationController _animationController;
@@ -40,16 +42,6 @@ class _HistoryScreenState extends State<HistoryScreen>
     super.initState();
     _fetchAttendanceHistory();
     _initAnimations();
-    _loadThemePreference();
-  }
-
-  Future<void> _loadThemePreference() async {
-    final isDarkMode = await SharedStorage.getThemeMode();
-    if (mounted) {
-      setState(() {
-        _isDarkMode = isDarkMode;
-      });
-    }
   }
 
   void _initAnimations() {
@@ -76,14 +68,6 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
 
     _animationController.forward();
-  }
-
-  void _toggleTheme() {
-    setState(() {
-      _isDarkMode = !_isDarkMode;
-    });
-    // Save theme preference
-    SharedStorage.saveThemeMode(_isDarkMode);
   }
 
   @override
@@ -215,7 +199,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           Icon(
             Icons.calendar_today,
             size: 80,
-            color: _isDarkMode
+            color: _themeProvider.isDarkMode
                 ? AppColors.darkTextSecondary.withValues(alpha: 0.5)
                 : AppColors.textTertiary,
           ),
@@ -225,7 +209,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextPrimary
                   : AppColors.textPrimary,
             ),
@@ -235,7 +219,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             'Anda belum melakukan absensi',
             style: TextStyle(
               fontSize: 16,
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextSecondary
                   : AppColors.textSecondary,
             ),
@@ -279,7 +263,7 @@ class _HistoryScreenState extends State<HistoryScreen>
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: _isDarkMode
+          color: _themeProvider.isDarkMode
               ? AppColors.darkSurface
               : AppColors.surface,
           borderRadius: BorderRadius.circular(16),
@@ -296,7 +280,7 @@ class _HistoryScreenState extends State<HistoryScreen>
           leading: Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: statusColor.withValues(alpha: _isDarkMode ? 0.2 : 0.1),
+              color: statusColor.withValues(alpha: _themeProvider.isDarkMode ? 0.2 : 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -349,7 +333,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   Icon(
                     Icons.location_on,
                     size: 16,
-                    color: _isDarkMode
+                    color: _themeProvider.isDarkMode
                         ? AppColors.darkTextSecondary
                         : AppColors.textSecondary,
                   ),
@@ -358,7 +342,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                     child: Text(
                       '${absen['latitude']}, ${absen['longitude']}',
                       style: TextStyle(
-                        color: _isDarkMode
+                        color: _themeProvider.isDarkMode
                             ? AppColors.darkTextSecondary
                             : AppColors.textSecondary,
                         fontSize: 14,
@@ -378,7 +362,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               Icon(
                 Icons.access_time,
                 size: 18,
-                color: _isDarkMode
+                color: _themeProvider.isDarkMode
                     ? AppColors.darkTextSecondary
                     : AppColors.textSecondary,
               ),
@@ -386,7 +370,7 @@ class _HistoryScreenState extends State<HistoryScreen>
               Text(
                 absen['waktu_absen'],
                 style: TextStyle(
-                  color: _isDarkMode
+                  color: _themeProvider.isDarkMode
                       ? AppColors.darkTextPrimary
                       : AppColors.textPrimary,
                   fontWeight: FontWeight.w500,
@@ -403,7 +387,7 @@ class _HistoryScreenState extends State<HistoryScreen>
   @override
   Widget build(BuildContext context) {
     return AnimatedBackground(
-      isDarkMode: _isDarkMode,
+      isDarkMode: _themeProvider.isDarkMode,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -421,14 +405,14 @@ class _HistoryScreenState extends State<HistoryScreen>
           ),
           actions: [
             // Theme toggle button
-            _buildThemeToggle(),
+            const ThemeToggleButton(),
           ],
         ),
         body: SafeArea(
           child: _isLoading
               ? Center(
                   child: CircularProgressIndicator(
-                    color: _isDarkMode
+                    color: _themeProvider.isDarkMode
                         ? AppColors.darkAccent
                         : AppColors.formalNavy,
                   ),
@@ -437,7 +421,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                   ? _buildEmptyState()
                   : RefreshIndicator(
                       onRefresh: _handleRefresh,
-                      color: _isDarkMode
+                      color: _themeProvider.isDarkMode
                           ? AppColors.darkAccent
                           : AppColors.formalNavy,
                       child: CustomScrollView(
@@ -452,7 +436,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                                   child: Text(
                                     'Total Absensi: ${_attendanceHistory.length}',
                                     style: TextStyle(
-                                      color: _isDarkMode
+                                      color: _themeProvider.isDarkMode
                                           ? AppColors.darkTextPrimary
                                           : Colors.white70,
                                       fontSize: 16,
@@ -477,34 +461,6 @@ class _HistoryScreenState extends State<HistoryScreen>
                       ),
                     ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildThemeToggle() {
-    return Container(
-      margin: const EdgeInsets.only(right: 16),
-      decoration: BoxDecoration(
-        color: _isDarkMode
-            ? AppColors.darkSurface.withValues(alpha: 0.8)
-            : Colors.white.withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-          ),
-        ],
-      ),
-      child: IconButton(
-        icon: Icon(
-          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-          color: _isDarkMode
-              ? AppColors.darkTextPrimary
-              : Colors.white,
-        ),
-        onPressed: _toggleTheme,
-        tooltip: _isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       ),
     );
   }

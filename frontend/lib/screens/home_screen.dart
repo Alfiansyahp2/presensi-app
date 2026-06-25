@@ -10,6 +10,7 @@ import '../core/widgets/animated_background.dart';
 import '../core/theme/app_colors.dart';
 import '../api/absensi_api.dart';
 import '../models/attendance_status_model.dart';
+import '../providers/theme_provider.dart';
 import 'history_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
@@ -49,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen>
   DateTime? _currentTime;
 
   // ⚙️ State
-  bool _isDarkMode = false;
+  final ThemeProvider _themeProvider = ThemeProvider();
   bool _isLoading = false;
   bool _isLoadingLocation = false;
   bool _isSubmitting = false;
@@ -72,7 +73,6 @@ class _HomeScreenState extends State<HomeScreen>
     _currentTime = DateTime.now();
     _initAnimations();
     _loadData();
-    _loadThemePreference();
     _startClock();
   }
 
@@ -166,15 +166,6 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  Future<void> _loadThemePreference() async {
-    final isDarkMode = await SharedStorage.getThemeMode();
-    if (mounted) {
-      setState(() {
-        _isDarkMode = isDarkMode;
-      });
-    }
-  }
-
   void _initAnimations() {
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 1200),
@@ -207,13 +198,6 @@ class _HomeScreenState extends State<HomeScreen>
         curve: Curves.easeOutCubic,
       ),
     );
-  }
-
-  void _toggleTheme() {
-    setState(() {
-      _isDarkMode = !_isDarkMode;
-    });
-    SharedStorage.saveThemeMode(_isDarkMode);
   }
 
   @override
@@ -379,7 +363,7 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        backgroundColor: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
+        backgroundColor: _themeProvider.isDarkMode ? AppColors.darkSurface : AppColors.surface,
         title: Row(
           children: [
             Icon(Icons.check_circle, color: AppColors.formalGreen),
@@ -387,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen>
             Text(
               title,
               style: TextStyle(
-                color: _isDarkMode
+                color: _themeProvider.isDarkMode
                     ? AppColors.darkTextPrimary
                     : AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
@@ -398,7 +382,7 @@ class _HomeScreenState extends State<HomeScreen>
         content: Text(
           message,
           style: TextStyle(
-            color: _isDarkMode
+            color: _themeProvider.isDarkMode
                 ? AppColors.darkTextSecondary
                 : AppColors.textSecondary,
           ),
@@ -451,7 +435,7 @@ class _HomeScreenState extends State<HomeScreen>
           );
 
     return AnimatedBackground(
-      isDarkMode: _isDarkMode,
+      isDarkMode: _themeProvider.isDarkMode,
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
@@ -506,7 +490,7 @@ class _HomeScreenState extends State<HomeScreen>
   Widget _buildThemeToggle() {
     return Container(
       decoration: BoxDecoration(
-        color: _isDarkMode
+        color: _themeProvider.isDarkMode
             ? AppColors.darkSurface.withOpacity(0.8)
             : Colors.white.withOpacity(0.8),
         borderRadius: BorderRadius.circular(20),
@@ -519,11 +503,11 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: IconButton(
         icon: Icon(
-          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
-          color: _isDarkMode ? AppColors.darkTextPrimary : Colors.white,
+          _themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+          color: _themeProvider.isDarkMode ? AppColors.darkTextPrimary : Colors.white,
         ),
-        onPressed: _toggleTheme,
-        tooltip: _isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+        onPressed: () => _themeProvider.toggleTheme(),
+        tooltip: _themeProvider.isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
       ),
     );
   }
@@ -537,14 +521,14 @@ class _HomeScreenState extends State<HomeScreen>
             width: 40,
             height: 40,
             child: CircularProgressIndicator(
-              color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
+              color: _themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
             ),
           ),
           const SizedBox(height: 20),
           Text(
             'Memuat data...',
             style: TextStyle(
-              color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
+              color: _themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
               fontSize: 16,
             ),
           ),
@@ -565,7 +549,7 @@ class _HomeScreenState extends State<HomeScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: _isDarkMode
+          colors: _themeProvider.isDarkMode
               ? [
                   AppColors.darkSurface,
                   AppColors.darkSurface.withValues(alpha: 0.8),
@@ -577,7 +561,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+          color: (_themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
               .withValues(alpha: 0.3),
           width: 2,
         ),
@@ -599,18 +583,18 @@ class _HomeScreenState extends State<HomeScreen>
                 width: 60,
                 height: 60,
                 decoration: BoxDecoration(
-                  color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+                  color: (_themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
                       .withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+                    color: (_themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
                         .withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
                 child: Icon(
                   Icons.school,
-                  color: _isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
+                  color: _themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy,
                   size: 32,
                 ),
               ),
@@ -625,7 +609,7 @@ class _HomeScreenState extends State<HomeScreen>
                     Text(
                       _schoolInfo!.namaSekolah,
                       style: TextStyle(
-                        color: _isDarkMode
+                        color: _themeProvider.isDarkMode
                             ? AppColors.darkTextPrimary
                             : AppColors.textPrimary,
                         fontSize: 18,
@@ -640,7 +624,7 @@ class _HomeScreenState extends State<HomeScreen>
                         Icon(
                           Icons.calendar_today,
                           size: 14,
-                          color: _isDarkMode
+                          color: _themeProvider.isDarkMode
                               ? AppColors.darkAccent
                               : AppColors.formalNavy,
                         ),
@@ -648,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen>
                         Text(
                           _formatDate_ddMMyyyy(_currentTime!),
                           style: TextStyle(
-                            color: _isDarkMode
+                            color: _themeProvider.isDarkMode
                                 ? AppColors.darkTextSecondary
                                 : AppColors.textSecondary,
                             fontSize: 13,
@@ -667,7 +651,7 @@ class _HomeScreenState extends State<HomeScreen>
           // Divider
           Container(
             height: 1,
-            color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+            color: (_themeProvider.isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
                 .withValues(alpha: 0.2),
           ),
           const SizedBox(height: 24),
@@ -690,7 +674,7 @@ class _HomeScreenState extends State<HomeScreen>
                 // Container divider vertical
                 Container(
                   width: 1,
-                  color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+                  color: (_themeProvider.isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
                       .withValues(alpha: 0.2),
                 ),
                 const SizedBox(width: 16),
@@ -730,7 +714,7 @@ class _HomeScreenState extends State<HomeScreen>
         Text(
           label,
           style: TextStyle(
-            color: _isDarkMode
+            color: _themeProvider.isDarkMode
                 ? AppColors.darkTextSecondary
                 : AppColors.textSecondary,
             fontSize: 13,
@@ -761,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen>
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: _isDarkMode
+          colors: _themeProvider.isDarkMode
               ? [
                   AppColors.darkSurface,
                   AppColors.darkSurface.withValues(alpha: 0.8),
@@ -773,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: (_isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
+          color: (_themeProvider.isDarkMode ? AppColors.darkAccent : AppColors.formalNavy)
               .withValues(alpha: 0.2),
           width: 2,
         ),
@@ -792,7 +776,7 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             'Status Hari Ini',
             style: TextStyle(
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextSecondary
                   : AppColors.textSecondary,
               fontSize: 14,
@@ -823,7 +807,7 @@ class _HomeScreenState extends State<HomeScreen>
                 // Container divider vertical
                 Container(
                   width: 1,
-                  color: (_isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
+                  color: (_themeProvider.isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary)
                       .withValues(alpha: 0.2),
                 ),
 
@@ -872,7 +856,7 @@ class _HomeScreenState extends State<HomeScreen>
             Text(
               type,
               style: TextStyle(
-                color: _isDarkMode
+                color: _themeProvider.isDarkMode
                     ? AppColors.darkTextSecondary
                     : AppColors.textSecondary,
                 fontSize: 14,
@@ -922,7 +906,7 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             label,
             style: TextStyle(
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextSecondary
                   : AppColors.textSecondary,
               fontSize: 12,
@@ -931,7 +915,7 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             value,
             style: TextStyle(
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextPrimary
                   : AppColors.textPrimary,
               fontSize: 13,
@@ -974,7 +958,7 @@ class _HomeScreenState extends State<HomeScreen>
       scale: _scaleAnimation,
       child: Container(
         decoration: BoxDecoration(
-          color: _isDarkMode ? AppColors.darkSurface : AppColors.surface,
+          color: _themeProvider.isDarkMode ? AppColors.darkSurface : AppColors.surface,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -1132,7 +1116,7 @@ class _HomeScreenState extends State<HomeScreen>
           Text(
             'Selesai!',
             style: TextStyle(
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextPrimary
                   : AppColors.textPrimary,
               fontSize: 20,
@@ -1144,7 +1128,7 @@ class _HomeScreenState extends State<HomeScreen>
             'Anda sudah menyelesaikan absensi hari ini.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _isDarkMode
+              color: _themeProvider.isDarkMode
                   ? AppColors.darkTextSecondary
                   : AppColors.textSecondary,
               fontSize: 14,

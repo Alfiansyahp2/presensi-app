@@ -194,15 +194,18 @@ class School extends Model
 
         $totalUsers = $this->activeUsers()->where('role', User::ROLE_STUDENT)->count();
 
+        // Count unique users who attended today
+        $uniqueUsersAttended = $attendances->pluck('user_id')->unique()->count();
+
         return [
             'total_users' => $totalUsers,
             'present' => $attendances->where('status', 'HADIR')->count(),
             'late' => $attendances->where('status', 'TERLAMBAT')->count(),
             'permission' => $attendances->where('status', 'IZIN')->count(),
             'sick' => $attendances->where('status', 'SAKIT')->count(),
-            'absent' => $totalUsers - $attendances->count(),
+            'absent' => max(0, $totalUsers - $uniqueUsersAttended),
             'attendance_rate' => $totalUsers > 0
-                ? round(($attendances->count() / $totalUsers) * 100, 2)
+                ? round(($uniqueUsersAttended / $totalUsers) * 100, 2)
                 : 0,
         ];
     }

@@ -76,9 +76,12 @@ class AuthService {
       final responseData = json.decode(utf8.decode(response.bodyBytes));
 
       if (response.statusCode == 200) {
-        // Perhatikan perubahan di sini:
-        if (responseData['token'] == null || responseData['data'] == null) {
+        // API sekarang mengembalikan: { token, data: { user: {...} } }
+        if (responseData['token'] == null ||
+            responseData['data'] == null ||
+            responseData['data']['user'] == null) {
           debugPrint('Missing required fields in response');
+          debugPrint('Response: $responseData');
           return {
             'success': false,
             'message': 'Format response tidak valid',
@@ -90,7 +93,7 @@ class AuthService {
           'success': true,
           'message': responseData['message'] ?? 'Login berhasil',
           'token': responseData['token'],
-          'user': responseData['data'], // Ubah dari 'user' ke 'data'
+          'user': responseData['data']['user'], // Ambil user object dari data
         };
       } else {
         return {

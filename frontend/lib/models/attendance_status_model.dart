@@ -122,12 +122,16 @@ class SchoolInfo {
   final String jamMasuk;
   final String jamPulang;
   final int radiusPresensi;
+  final double latitude;
+  final double longitude;
 
   SchoolInfo({
     required this.namaSekolah,
     required this.jamMasuk,
     required this.jamPulang,
     required this.radiusPresensi,
+    required this.latitude,
+    required this.longitude,
   });
 
   factory SchoolInfo.fromJson(Map<String, dynamic> json) {
@@ -136,7 +140,18 @@ class SchoolInfo {
       jamMasuk: json['jam_masuk']?.toString() ?? '07:00:00',
       jamPulang: json['jam_pulang']?.toString() ?? '15:00:00',
       radiusPresensi: json['radius_presensi'] as int? ?? 50,
+      latitude: _parseDouble(json['latitude']),
+      longitude: _parseDouble(json['longitude']),
     );
+  }
+
+  /// Helper untuk parse double dengan aman (handle string to double conversion)
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
   }
 
   /// Helper untuk format jam agar lebih readable
